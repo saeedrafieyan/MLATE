@@ -2,29 +2,13 @@
 
 MLATE is the name of a series of ML-based predictive models that are developed for tissue engineering. 
 
-MLATE_Cardica_Cell_Prediction_V1 is capable to predicts cell behavior on cardiac tissue engineering scaffolds.
+You will need Python on your PC to use our models. If you don't have Python, follow https://python.org and download it based on your operating system. 
 
-## usage
-
-install XGBoost
-
-```bash
-pip install xgboost
-```
-
-## Usage
-Load the model using pickle and pass it materials, cell line, and fabrication method.
-
-```python
-import pickle
-
-filename = 'MLATE_Cardica_Cell_Prediction_V1'
-model = pickle.load(open(filename, 'rb'))
+in the first step, you should input your material compositions, cell lines and fabrication method to ```bash input.xlsx ```  file. then simply run ```bash prediction.py ``` file. 
 
 
-```
 
 ## cite our paper
-You can find our paper online at [link will be provided soon]
+You can find our paper online at https://doi.org/10.1016/j.compbiomed.2023.106804
 
 
