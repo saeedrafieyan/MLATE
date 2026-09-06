@@ -1,0 +1,40 @@
+# Hugging Face Space runtime for the MLATE V3 application.
+#
+# Deliberately smaller than the analysis environment at the repository root.
+# A Space serves predictions from artefacts that were already fitted; it never
+# trains, tunes or clusters, so the training-time dependencies are omitted.
+#
+# All three model families are served, which is why torch is here. It is the
+# largest item in the image by a wide margin, and it is pulled from PyTorch's
+# CPU index below: the default wheel carries the CUDA runtime, which a Space
+# on CPU hardware cannot use and which multiplies the image size several times
+# over. A Space on GPU hardware should drop the two index lines and take the
+# default wheel instead.
+#
+# Cost of the foundation models, measured on this corpus with a batch of 32
+# candidates: about 1 s per pass on a GPU and about 17 s on CPU, against 80 ms
+# for the best conventional classifier. A 150-trial search is therefore a few
+# seconds, roughly a minute, or roughly three minutes depending on which family
+# is chosen and what the host has. The application states this beside the menu.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+streamlit==1.58.0
+pandas==2.3.3
+numpy==2.4.4
+scipy==1.17.1
+scikit-learn==1.8.0
+category_encoders==2.9.0
+xgboost==3.2.0
+lightgbm==4.6.0
+catboost==1.2.10
+optuna==4.8.0
+joblib==1.5.3
+pyarrow==24.0.0
+
+# Deep networks and in-context foundation models. The "+cpu" local version
+# exists only on the PyTorch index above, which is what forces pip to resolve
+# it there: the plain "torch==2.11.0" on PyPI is the CUDA build on Linux and
+# pulls the whole NVIDIA runtime, several gigabytes a CPU Space cannot use.
+torch==2.11.0+cpu
+tabicl==2.1.1
+tabpfn==7.1.1

@@ -1,0 +1,56 @@
+# MLATE V3 — analysis environment
+#
+# Exact pins, not floors. Results in the manuscript depend on library version:
+# scikit-learn 1.5 and 1.8 do not produce identical numbers, and XGBoost 2.x
+# and 3.x differ more than that. A reader who installs a floor range gets
+# whatever is current on the day and cannot reproduce Tables S11-S12.
+#
+#     python -m pip install -r requirements.txt
+#
+# Verified against Python 3.14.3. Earlier Python versions are untested; several
+# of these wheels are built for 3.13+.
+
+# ── data handling ────────────────────────────────────────────────────────────
+pandas==2.3.3
+numpy==2.4.4
+scipy==1.17.1
+pyarrow==24.0.0          # parquet engine for pandas; every intermediate table
+openpyxl==3.1.5          # .xlsx read
+XlsxWriter==3.2.9        # .xlsx write
+joblib==1.5.3            # parallel sweeps and model persistence
+threadpoolctl==3.6.0     # pins BLAS/OpenMP to one thread inside workers
+psutil==7.2.2            # detects total RAM for the resource budget
+
+# ── conventional machine learning ────────────────────────────────────────────
+scikit-learn==1.8.0
+category_encoders==2.9.0   # BinaryEncoder for the cell-line column
+xgboost==3.2.0
+lightgbm==4.6.0
+catboost==1.2.10
+imbalanced-learn==0.14.2   # resampling arms of the ablation study
+optuna==4.8.0              # hyperparameter search
+
+# HDBSCAN is NOT listed: scikit-learn >= 1.3 ships sklearn.cluster.HDBSCAN and
+# that is what the clustering stage imports. The standalone `hdbscan` package
+# was required by earlier versions of this pipeline and is no longer a
+# dependency.
+
+# ── deep learning and tabular foundation models ──────────────────────────────
+# Installed here as the CUDA 13.0 build (torch 2.11.0+cu130). The bare version
+# below resolves to the CPU wheel on PyPI, which reproduces every result more
+# slowly. For the GPU build used in the manuscript:
+#     pip install torch==2.11.0 --index-url https://download.pytorch.org/whl/cu130
+torch==2.11.0
+tabpfn==7.1.1
+tabicl==2.1.1
+
+# ── figures ──────────────────────────────────────────────────────────────────
+matplotlib==3.10.9
+
+# UMAP is NOT listed. Earlier versions of the clustering figures used it; the
+# reported figures use a linear-discriminant projection instead, because the
+# silhouette of the reported partition measured inside a UMAP embedding is
+# -0.063 — the embedding interleaves the groups it was meant to display.
+
+# ── web application (not required to reproduce the analysis) ─────────────────
+streamlit==1.58.0

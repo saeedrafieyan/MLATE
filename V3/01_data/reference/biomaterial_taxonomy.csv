@@ -1,0 +1,131 @@
+﻿column,display_name,unit,material_class,changed_from,audit_verdict,held_because,evidence_url,n_samples,n_studies
+Liver dECM (%w/v),Liver dECM,%w/v,ECM_derived,natural_polymer,Conditional,,https://pmc.ncbi.nlm.nih.gov/articles/PMC6376869/,139,9
+cECM (%w/v),cECM,%w/v,ECM_derived,natural_polymer,Conditional,,https://pmc.ncbi.nlm.nih.gov/articles/PMC6376869/,118,8
+matrigel (%w/v),matrigel,%w/v,ECM_derived,natural_polymer,Conditional,,https://www.corning.com/worldwide/en/products/life-sciences/products/surfaces/matrigel-matrix.html,19,5
+KdECM (%w/v),KdECM,%w/v,ECM_derived,natural_polymer,Conditional,,https://pmc.ncbi.nlm.nih.gov/articles/PMC6376869/,11,3
+vascular tissue-derived dECM (%w/v),vascular tissue-derived dECM,%w/v,ECM_derived,natural_polymer,name changed,,,7,2
+omentum ECM (%w/v),omentum ECM,%w/v,ECM_derived,natural_polymer,name changed,,,2,1
+Vitamin B2 (%w/v),Vitamin B2,%w/v,bioactive_material,,Conditional,audit verdict Conditional - role depends on source study,https://pubs.rsc.org/en/content/articlehtml/2017/py/c6py02034h,20,2
+diTyr-RGD (mM),diTyr-RGD,mM,bioactive_material,,Correct,,https://pubmed.ncbi.nlm.nih.gov/25462848/,8,1
+MMP2-degradable peptide (%w/v),MMP2-degradable peptide,%w/v,bioactive_material,,Conditional,audit verdict Conditional,https://pmc.ncbi.nlm.nih.gov/articles/PMC5577801/,8,1
+VEGF (%w/v),VEGF,%w/v,bioactive_material,,Correct,,https://pubmed.ncbi.nlm.nih.gov/25462848/,6,1
+α-Toc (µM),α-Toc,µM,bioactive_material,,Correct,,https://pubmed.ncbi.nlm.nih.gov/25462848/,5,1
+ascorbic acid (mM),ascorbic acid,mM,bioactive_material,,Correct,,https://pubmed.ncbi.nlm.nih.gov/25462848/,5,1
+aprotinin (µg/ml),aprotinin,µg/ml,bioactive_material,,Correct,,https://pubmed.ncbi.nlm.nih.gov/25462848/,3,2
+RGD (mM),RGD,mM,bioactive_material,,Correct,,https://pubmed.ncbi.nlm.nih.gov/25462848/,1,1
+astaxanthin (%w/v),astaxanthin,%w/v,bioactive_material,,Correct,,https://pubmed.ncbi.nlm.nih.gov/25462848/,1,1
+hydroxyapatite (%w/v),hydroxyapatite,%w/v,bioceramics,,Correct,,https://pubmed.ncbi.nlm.nih.gov/26646669/,43,3
+TCP (%w/v),TCP,%w/v,bioceramics,,Correct,,https://pubmed.ncbi.nlm.nih.gov/26646669/,9,2
+bioactive glass (%w/v),bioactive glass,%w/v,bioceramics,,Correct,,https://pubmed.ncbi.nlm.nih.gov/26646669/,7,2
+borate bioactive glass (%w/v),borate bioactive glass,%w/v,bioceramics,,name changed,,,1,1
+laponite (%w/v),laponite,%w/v,clay,,Correct,,https://pubmed.ncbi.nlm.nih.gov/28467835/,96,6
+Laponite-XLG (%w/w),Laponite-XLG,%w/w,clay,,Correct,,https://pubmed.ncbi.nlm.nih.gov/28467835/,25,1
+CaCl2 (mM),CaCl2,mM,crosslinker,,Correct,,https://pubmed.ncbi.nlm.nih.gov/24828818/,1057,98
+glutaraldehyde (%w/v),glutaraldehyde,%w/v,crosslinker,,Correct,,https://pubmed.ncbi.nlm.nih.gov/24828818/,62,3
+hydrogen peroxide (H2O2) (%v/v),hydrogen peroxide (H2O2),%v/v,crosslinker,,Conditional,co-substrate of HRP crosslinking,https://pmc.ncbi.nlm.nih.gov/articles/PMC7725231/,55,2
+CaSO4 (%w/v),CaSO4,%w/v,crosslinker,,Correct,,https://pubmed.ncbi.nlm.nih.gov/24828818/,32,7
+EDC (mg),EDC,mg,crosslinker,,Correct,,https://pubmed.ncbi.nlm.nih.gov/24828818/,22,2
+NHS (mg),NHS,mg,crosslinker,,Incorrect,part of EDC-NHS crosslinking chemistry,https://pubmed.ncbi.nlm.nih.gov/24828818/,22,2
+Genipin (%w/v),Genipin,%w/v,crosslinker,,Correct,,https://pubmed.ncbi.nlm.nih.gov/24828818/,18,2
+BaCl2 (mM),BaCl2,mM,crosslinker,,Correct,,https://pubmed.ncbi.nlm.nih.gov/24828818/,12,2
+DTT (%w/v),DTT,%w/v,crosslinker,,name changed,thiol crosslinker (audit confirmed DDT was a typo),,10,2
+CaCO3 (mM),CaCO3,mM,crosslinker,,Conditional,internal ionic crosslinking source,https://pubmed.ncbi.nlm.nih.gov/16677028/,9,1
+SrCl2 (mM),SrCl2,mM,crosslinker,,Correct,,https://pubmed.ncbi.nlm.nih.gov/24828818/,6,2
+HRP (U/ml),HRP,U/ml,enzyme,,Correct,,https://enzyme.expasy.org/,68,4
+trans-glutaminase (%w/v),trans-glutaminase,%w/v,enzyme,,Correct,,https://enzyme.expasy.org/,63,7
+thrombin (unit/ml),thrombin,unit/ml,enzyme,,Correct,,https://enzyme.expasy.org/,41,6
+alginate lyase (U/ml),alginate lyase,U/ml,enzyme,,Correct,,https://enzyme.expasy.org/,7,1
+Irgacure 2959 (%w/v),Irgacure 2959,%w/v,initiator,crosslinker,Incorrect,,https://pmc.ncbi.nlm.nih.gov/articles/PMC5050040/,530,23
+LAP (%w/v),LAP,%w/v,initiator,crosslinker,Incorrect,,https://pmc.ncbi.nlm.nih.gov/articles/PMC5050040/,310,30
+Eosin Y (%w/v),Eosin Y,%w/v,initiator,crosslinker,Incorrect,,https://pmc.ncbi.nlm.nih.gov/articles/PMC5050040/,32,3
+Ruthenium (mM),Ruthenium,mM,initiator,crosslinker,Incorrect,,https://pmc.ncbi.nlm.nih.gov/articles/PMC5050040/,28,4
+sodium persulfate (SPS) (mM),sodium persulfate (SPS),mM,initiator,crosslinker,Incorrect,,https://pmc.ncbi.nlm.nih.gov/articles/PMC5050040/,28,4
+ammonium persulfate (mM),ammonium persulfate,mM,initiator,crosslinker,Incorrect,,https://pmc.ncbi.nlm.nih.gov/articles/PMC5050040/,16,1
+Rose Bengal (%w/v),Rose Bengal,%w/v,initiator,crosslinker,Incorrect,,https://pmc.ncbi.nlm.nih.gov/articles/PMC5050040/,14,3
+VA086 (%w/v),VA086,%w/v,initiator,crosslinker,Incorrect,,https://pmc.ncbi.nlm.nih.gov/articles/PMC5050040/,10,2
+Triethanolamine (%v/v),Triethanolamine,%v/v,initiator,crosslinker,Incorrect,,https://pmc.ncbi.nlm.nih.gov/articles/PMC5050040/,4,1
+1-Vinyl-2-pyrrolidone (v/v),1-Vinyl-2-pyrrolidone,v/v,initiator,crosslinker,name changed,,,4,1
+GelMA (%w/v),GelMA,%w/v,modified_natural_polymer,,Correct,,https://pmc.ncbi.nlm.nih.gov/articles/PMC6499775/,880,62
+Nano/Methylcellulose (%w/v),Nano/Methylcellulose,%w/v,modified_natural_polymer,,name changed,audit verdict Conditional,,157,21
+hyaluronan methacrylate (%w/v),hyaluronan methacrylate,%w/v,modified_natural_polymer,,name changed,,,151,9
+sodium carboxymethyl cellulose (mg),sodium carboxymethyl cellulose,mg,modified_natural_polymer,,Correct,,https://pmc.ncbi.nlm.nih.gov/articles/PMC6499775/,60,2
+Alginate dialdehyde (%w/v),Alginate dialdehyde,%w/v,modified_natural_polymer,,Correct,,https://pmc.ncbi.nlm.nih.gov/articles/PMC6499775/,48,6
+MeTro (%w/v),MeTro,%w/v,modified_natural_polymer,,Correct,,https://pmc.ncbi.nlm.nih.gov/articles/PMC6150941/,28,1
+Alginate sulfate (%w/v),Alginate sulfate,%w/v,modified_natural_polymer,,Correct,,https://pmc.ncbi.nlm.nih.gov/articles/PMC6499775/,26,1
+methacrylated collagen (%w/v),methacrylated collagen,%w/v,modified_natural_polymer,,Correct,,https://pmc.ncbi.nlm.nih.gov/articles/PMC6499775/,25,4
+alginate methacrylate (%w/v),alginate methacrylate,%w/v,modified_natural_polymer,,Correct,,https://pmc.ncbi.nlm.nih.gov/articles/PMC6499775/,24,2
+galactosylated alginate (%w/v),galactosylated alginate,%w/v,modified_natural_polymer,,Correct,,https://pmc.ncbi.nlm.nih.gov/articles/PMC6499775/,22,3
+PVA-HA (%w/v),PVA-HA,%w/v,modified_natural_polymer,,Incorrect,hybrid natural/synthetic; nearest existing class,https://pmc.ncbi.nlm.nih.gov/articles/PMC8431644/,15,2
+gel-fu (%w/v),gel-fu,%w/v,modified_natural_polymer,,Correct,,https://par.nsf.gov/servlets/purl/10160745,15,3
+KdECMMA (%w/v),KdECMMA,%w/v,modified_natural_polymer,,Correct,,https://advanced.onlinelibrary.wiley.com/doi/10.1002/adhm.202501616,15,1
+Methacrylated gellan gum (%w/v),Methacrylated gellan gum,%w/v,modified_natural_polymer,,Correct,,https://pmc.ncbi.nlm.nih.gov/articles/PMC6499775/,15,1
+NorCol (%w/v),NorCol,%w/v,modified_natural_polymer,,Correct,,https://pubmed.ncbi.nlm.nih.gov/36963108/,13,1
+thiolated HA (%w/v),thiolated HA,%w/v,modified_natural_polymer,,Correct,,https://pmc.ncbi.nlm.nih.gov/articles/PMC6499775/,10,1
+CS-AEMA (%w/v),CS-AEMA,%w/v,modified_natural_polymer,,Correct,,https://pmc.ncbi.nlm.nih.gov/articles/PMC6499775/,8,1
+hyaluronic acid+ Ph moieties (%w/v),hyaluronic acid+ Ph moieties,%w/v,modified_natural_polymer,,Correct,,https://pubmed.ncbi.nlm.nih.gov/32608143/,8,1
+PEG-Fibrinogen (%w/v),PEG-Fibrinogen,%w/v,modified_natural_polymer,,Conditional,audit verdict Conditional,https://pmc.ncbi.nlm.nih.gov/articles/PMC10876640/,8,3
+skeletal muscle ECM methacrylate (%w/v),skeletal muscle ECM methacrylate,%w/v,modified_natural_polymer,,Correct,,https://pmc.ncbi.nlm.nih.gov/articles/PMC6499775/,7,1
+NorHA (%w/v),NorHA,%w/v,modified_natural_polymer,,Correct,,https://www.sciencedirect.com/science/article/pii/S0142961213010673,4,1
+poly(N-isopropylacrylamide) grafted hyaluronan (%w/v),poly(N-isopropylacrylamide) grafted hyaluronan,%w/v,modified_natural_polymer,,Correct,,https://pmc.ncbi.nlm.nih.gov/articles/PMC6499775/,3,1
+RGD-modified alginate (%w/v),RGD-modified alginate,%w/v,modified_natural_polymer,,Correct,,https://pmc.ncbi.nlm.nih.gov/articles/PMC6499775/,2,1
+chondroitin sulfate methacrylate (%w/v),chondroitin sulfate methacrylate,%w/v,modified_natural_polymer,,Correct,,https://pmc.ncbi.nlm.nih.gov/articles/PMC6499775/,1,1
+SFMA-L (%w/v),SFMA-L,%w/v,modified_natural_polymer,,Correct,,https://pmc.ncbi.nlm.nih.gov/articles/PMC10468767/,1,1
+SFMA-M (%w/v),SFMA-M,%w/v,modified_natural_polymer,,Correct,,https://pmc.ncbi.nlm.nih.gov/articles/PMC10468767/,1,1
+SFMA-H (%w/v),SFMA-H,%w/v,modified_natural_polymer,,Correct,,https://pmc.ncbi.nlm.nih.gov/articles/PMC10468767/,1,1
+graphene oxide (%w/v),graphene oxide,%w/v,nanomaterial,,Correct,,https://pubmed.ncbi.nlm.nih.gov/36286204/,43,4
+Lysozyme amyloid nanofibrils (mg),Lysozyme amyloid nanofibrils,mg,nanomaterial,,Correct,,https://pubmed.ncbi.nlm.nih.gov/36286204/,31,1
+gold nanorod (mg/mL),gold nanorod,mg/mL,nanomaterial,,Correct,,https://pubmed.ncbi.nlm.nih.gov/36286204/,24,1
+Carbon nanotube (CNT) (w/v),Carbon nanotube (CNT),w/v,nanomaterial,,Correct,,https://pubmed.ncbi.nlm.nih.gov/36286204/,18,3
+carboxyl functionalized carbon nanotubes (%w/v),carboxyl functionalized carbon nanotubes,%w/v,nanomaterial,,Correct,,https://pubmed.ncbi.nlm.nih.gov/36286204/,9,1
+Carbon dots (mg/ml),Carbon dots,mg/ml,nanomaterial,,Correct,,https://pubmed.ncbi.nlm.nih.gov/36286204/,9,1
+lysozyme amyloid nanofibrils:gold nanoparticles (mg),lysozyme amyloid nanofibrils:gold nanoparticles,mg,nanomaterial,,Correct,,https://pubmed.ncbi.nlm.nih.gov/36286204/,6,1
+MXene (mg/ml),MXene,mg/ml,nanomaterial,,Correct,,https://pubmed.ncbi.nlm.nih.gov/36286204/,6,1
+boron nitride nanotubes (%w/v),boron nitride nanotubes,%w/v,nanomaterial,,Correct,,https://pmc.ncbi.nlm.nih.gov/articles/PMC2657038/,3,1
+rGO (mg/ml),rGO,mg/ml,nanomaterial,,Correct,,https://pubmed.ncbi.nlm.nih.gov/36286204/,2,1
+Alginate (%w/v),Alginate,%w/v,natural_polymer,,Correct,,https://www.nature.com/articles/s41598-024-62656-1,1138,111
+Gelatin (%w/v),Gelatin,%w/v,natural_polymer,,Correct,,https://www.nature.com/articles/s41598-024-62656-1,797,85
+Fibroin/Fibrinogen (%w/v),Fibroin/Fibrinogen,%w/v,natural_polymer,,Correct,,https://www.nature.com/articles/s41598-024-62656-1,207,22
+Collagen (%w/v),Collagen,%w/v,natural_polymer,,Correct,,https://www.nature.com/articles/s41598-024-62656-1,85,28
+Chitosan (%w/v),Chitosan,%w/v,natural_polymer,,Correct,,https://www.nature.com/articles/s41598-024-62656-1,74,5
+Hyaluronic_Acid (%w/v),Hyaluronic_Acid,%w/v,natural_polymer,,Correct,,https://www.nature.com/articles/s41598-024-62656-1,62,12
+Gellan (%w/v),Gellan,%w/v,natural_polymer,,Correct,,https://www.nature.com/articles/s41598-024-62656-1,54,5
+Agarose (%w/v),Agarose,%w/v,natural_polymer,,Correct,,https://www.nature.com/articles/s41598-024-62656-1,51,7
+Carrageenan (%v),Carrageenan,%v,natural_polymer,,Correct,,https://www.nature.com/articles/s41598-024-62656-1,43,3
+BA silk fibroin (%w/v),BA silk fibroin,%w/v,natural_polymer,modified_natural_polymer,name changed,,,32,1
+Laminin (ug/ml),Laminin,ug/ml,natural_polymer,,Correct,,https://www.nature.com/articles/s41598-024-62656-1,13,3
+egg white (w/v),egg white,w/v,natural_polymer,,Conditional,"protein mixture, not a decellularised matrix",https://www.nature.com/articles/s41598-024-62656-1,10,1
+Phytagel (%v),Phytagel,%v,natural_polymer,,Correct,,https://www.nature.com/articles/s41598-024-62656-1,1,1
+FBS (%v/v),FBS,%v/v,serum_buffer_plasma,,Correct,,https://pubchem.ncbi.nlm.nih.gov/,34,3
+HEPES (mM),HEPES,mM,serum_buffer_plasma,,Correct,,https://pubchem.ncbi.nlm.nih.gov/,22,3
+PBS (M),PBS,M,serum_buffer_plasma,,Correct,,https://pubchem.ncbi.nlm.nih.gov/,3,1
+PRP (%v/v),PRP,%v/v,serum_buffer_plasma,,Correct,,https://pubchem.ncbi.nlm.nih.gov/,3,1
+lactic acid (v/v),lactic acid,v/v,small_molecule,,name changed,,,30,1
+NaCl (mM),NaCl,mM,small_molecule,,Correct,,https://pubchem.ncbi.nlm.nih.gov/,23,7
+glycerol (%w/v),glycerol,%w/v,small_molecule,crosslinker,Incorrect,,https://doi.org/10.1016/j.matt.2022.12.013,21,3
+KCl (mM),KCl,mM,small_molecule,,Correct,,https://pubchem.ncbi.nlm.nih.gov/,15,1
+Na2HPO4 (%w/v),Na2HPO4,%w/v,small_molecule,,Correct,,https://pubchem.ncbi.nlm.nih.gov/,9,1
+D-glucose (%w/v),D-glucose,%w/v,small_molecule,,Correct,,https://pubchem.ncbi.nlm.nih.gov/,5,1
+Acetylsalicylic Acid (%w/w),Acetylsalicylic Acid,%w/w,small_molecule,,Correct,,https://pubchem.ncbi.nlm.nih.gov/,3,1
+β-D galactose (mM),β-D galactose,mM,small_molecule,,Correct,,https://pubchem.ncbi.nlm.nih.gov/,2,1
+PEGDA (%w/v),PEGDA,%w/v,synthetic_polymer,,Correct,,https://www.nature.com/articles/s41598-020-64480-9,119,9
+Pluronic F127 / Lutrol F127 (%w/v),Pluronic F127 / Lutrol F127,%w/v,synthetic_polymer,,name changed,,,83,9
+PVA (%wt),PVA,%wt,synthetic_polymer,,Correct,,https://www.nature.com/articles/s41598-020-64480-9,50,4
+polyethylene glycol dimethacrylate (%w/v),polyethylene glycol dimethacrylate,%w/v,synthetic_polymer,,Correct,,https://www.nature.com/articles/s41598-020-64480-9,50,2
+PCL (%w/v),PCL,%w/v,synthetic_polymer,,Correct,,https://www.nature.com/articles/s41598-020-64480-9,34,8
+PEGTA (%w/v),PEGTA,%w/v,synthetic_polymer,,Correct,,https://www.nature.com/articles/s41598-020-64480-9,33,1
+Carbopol ETD 2020 NF (%w/v),Carbopol ETD 2020 NF,%w/v,synthetic_polymer,,Correct,,https://www.lubrizol.com/solutions/products/carbopol/pharmaceuticals,32,2
+PEDOT:PSS (ul),PEDOT:PSS,ul,synthetic_polymer,,Correct,,https://www.nature.com/articles/s41598-020-64480-9,18,1
+Pluronic P-123 (%w/v),Pluronic P-123,%w/v,synthetic_polymer,,Correct,,https://care360.basf.com/global/en/Product-Finder/30087870,12,12
+PHEG-Tyr (%w/v),PHEG-Tyr,%w/v,synthetic_polymer,,Correct,,https://pubs.acs.org/doi/10.1021/acs.biomac.0c01641,12,1
+PVA methacrylate (%w/v),PVA methacrylate,%w/v,synthetic_polymer,,Correct,,https://www.nature.com/articles/s41598-020-64480-9,11,1
+PEG-8-SH (mM),PEG-8-SH,mM,synthetic_polymer,,Correct,,https://www.nature.com/articles/s41598-020-64480-9,10,2
+PEGMA (%w/v),PEGMA,%w/v,synthetic_polymer,,Correct,,https://www.nature.com/articles/s41598-020-64480-9,9,2
+PEO (%w/v),PEO,%w/v,synthetic_polymer,,Correct,,https://www.nature.com/articles/s41598-020-64480-9,9,1
+Carbopol Ultrez 10 NF (%w/v),Carbopol Ultrez 10 NF,%w/v,synthetic_polymer,,name changed,,,6,1
+DF-PEG (%w/v),DF-PEG,%w/v,synthetic_polymer,,Correct,,https://www.nature.com/articles/s41598-020-64480-9,6,1
+polyHIPE (%w/v),polyHIPE,%w/v,synthetic_polymer,,Correct,,https://onlinelibrary.wiley.com/doi/abs/10.1002/pi.5052,5,1
+PLGA (%w/v),PLGA,%w/v,synthetic_polymer,,Correct,,https://www.nature.com/articles/s41598-020-64480-9,4,1
+SC-PEG (%w/v),SC-PEG,%w/v,synthetic_polymer,,Correct,,https://www.nature.com/articles/s41598-020-64480-9,4,1
+Carbopol NF-980 (%w/v),Carbopol NF-980,%w/v,synthetic_polymer,,name changed,,,4,1
+Polypyrrole:PSS (%w/v),Polypyrrole:PSS,%w/v,synthetic_polymer,,Correct,,https://www.nature.com/articles/s41598-020-64480-9,3,1
+PGS (%w/v),PGS,%w/v,synthetic_polymer,,Correct,,https://www.nature.com/articles/s41598-020-64480-9,2,1

@@ -1,0 +1,23 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+
+# the source workbook is not redistributed; data/processed/ holds the release
+data/raw/*
+!data/raw/.gitkeep
+
+results/
+
+# Trained models and preprocessors are published to the Hugging Face
+# Space for the web application, not to git. GitHub carries the code
+# and the dataset only.
+deploy/
+*.log
+.ipynb_checkpoints/
+~$*
+.DS_Store
+
+# LLM provider key (OpenRouter). Never committed.
+.env
+.env.*
