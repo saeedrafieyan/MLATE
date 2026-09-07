@@ -69,8 +69,6 @@ mlate/                    shared library; nothing else hard-codes a path
 04_machine_learning/      conventional ML benchmark
 05_deep_learning/         tabular DL and foundation models
 06_webapp/                Streamlit application and deployment
-07_wssq/                  WSSQ sensitivity analysis
-08_interrater/            inter-rater agreement
 verify.py                 checks every published figure and table
 verify_comparability.py   proves all model classes share the same partitions
 ```

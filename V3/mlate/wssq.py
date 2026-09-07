@@ -4,8 +4,8 @@ Weighted Synergistic Scaffold Quality (WSSQ)
 
 The single score the optimiser maximises, combining Printability and Cell
 Response. This module is the canonical implementation: the web application,
-the Bayesian optimiser and the sensitivity analysis in `07_wssq/` all import
-from here, so there is exactly one definition of the metric in the project.
+the Bayesian optimiser and the sensitivity analysis all import from here, so
+there is exactly one definition of the metric in the project.
 
 The arithmetic is transcribed unchanged from the deployed V3 application
 (`app/legacy/wssq.py`). Nothing here alters a published score; what is added is
@@ -46,8 +46,9 @@ bounded above by the arithmetic mean the metric deliberately avoids.
 inside a bounded family. blend = 1 is the most conservative scoring the family
 permits, blend = 0 the most permissive, and because WSSQ is linear in `blend`
 the whole family lies between the two endpoints. The shipped default of 0.5
-sits at the midpoint. `07_wssq/sensitivity.py` reports how much the ranking of
-candidate formulations actually moves across that range.
+sits at the midpoint. A sensitivity analysis reported in the supplementary
+material quantifies how much the ranking of candidate formulations moves
+across that range.
 
 Two boundary rules
 ------------------

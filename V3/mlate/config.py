@@ -25,8 +25,7 @@ RESULTS_DIR = ROOT / "results"
 # Pipeline steps. Each has one results folder holding its figures, tables and
 # models, so an output is always next to the step that produced it.
 STEPS = ("01_data", "02_preprocessing", "03_clustering",
-         "04_machine_learning", "05_deep_learning", "06_webapp",
-         "07_wssq")
+         "04_machine_learning", "05_deep_learning", "06_webapp")
 
 
 def step_dir(step: str, kind: str | None = None) -> Path:
