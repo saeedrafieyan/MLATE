@@ -1,18 +1,3 @@
-"""
-Build and freeze the split manifests and preprocessing artefacts.
-
-    python -m preprocessing.run
-
-Writes to results/preprocessing/:
-    folds_<task>.csv          every fold's row indices, as a manifest
-    fold_summary.xlsx         one row per fold, for the supplement
-    leakage_report.xlsx       explicit evidence that grouped folds do not leak
-    feature_space.xlsx        what the preprocessor emits, per task
-
-Downstream stages read the manifests instead of re-deriving splits, so
-clustering, ML and DL are all scored on exactly the same partitions.
-"""
-
 from __future__ import annotations
 
 import sys
@@ -34,13 +19,6 @@ OUT = cfg.step_dir("02_preprocessing", "tables")
 
 
 def leakage_report(df: pd.DataFrame, folds: list[splits.Fold]) -> pd.DataFrame:
-    """
-    Quantify, per fold, how much study overlap the protocol allows.
-
-    A random fold should show a high sibling rate; a DOI fold must show zero
-    shared studies. Printing both side by side is the evidence for the
-    revised validation strategy.
-    """
     doi = df["DOI"].to_numpy()
     rows = []
     for f in folds:
@@ -82,7 +60,6 @@ def main() -> None:
         lr.insert(0, "task", task)
         leaks.append(lr)
 
-        # persist row indices so downstream stages cannot drift
         manifest = pd.concat([
             pd.DataFrame({"fold": f.name, "protocol": f.protocol,
                           "row": f.test_idx, "split": "test"})
@@ -90,7 +67,6 @@ def main() -> None:
         ], ignore_index=True)
         manifest.to_csv(OUT / f"folds_{task}.csv", index=False)
 
-        # what the model will actually see, fitted on one representative fold
         ref = next(f for f in folds if f.protocol == "doi")
         pre = build_preprocessor(columns)
         Xt = pre.fit_transform(sub[columns.predictors].iloc[ref.train_idx])

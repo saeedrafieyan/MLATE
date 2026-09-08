@@ -1,32 +1,3 @@
-"""
-Why printing parameters cannot be imputed across studies
-========================================================
-
-    python 02_preprocessing/study_structure.py
-
-Quantifies the property that governs every imputation decision in step 02: a
-printing parameter is a property of the *publication*, not of the formulation.
-A group buys one nozzle and one heater and uses them for every gel in the
-paper, so the value repeats down the study's rows and carries almost no
-within-study variation.
-
-Two statistics per column:
-
-  pct_var_between_studies  one-way variance decomposition on DOI. The share of
-                           total sum of squares that lies between studies
-                           rather than within them.
-  pct_studies_single_value among studies reporting the parameter more than
-                           once, the share that report exactly one distinct
-                           value across all of their rows.
-
-Both are computed on reported values only - imputed values would manufacture
-the very structure being measured.
-
-This is what makes the ungrouped R2 = 0.98 in the submitted version a retrieval
-score rather than an imputation score, and it is the evidence behind the
-two-tier fill in export_matrix.py.
-"""
-
 from __future__ import annotations
 
 import sys
@@ -57,7 +28,7 @@ def study_structure(df: pd.DataFrame, columns, group: str = GROUP) -> pd.DataFra
         between = float((n * (by_study.mean() - grand) ** 2).sum())
         total = within + between
 
-        repeated = n[n > 1].index          # a single-row study cannot disagree
+        repeated = n[n > 1].index
         single = by_study.nunique().reindex(repeated).eq(1)
 
         rows.append({

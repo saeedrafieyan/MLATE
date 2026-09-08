@@ -1,30 +1,3 @@
-"""
-Is the clustering finding chemistry, or finding studies?
-========================================================
-
-    python 03_clustering/diagnose.py
-
-Two questions that have to be answered before any cluster is interpreted.
-
-1. Study identity. Study membership already turned out to carry most of the
-   apparent signal in the imputation benchmark, and an unsupervised method has
-   no protection against it at all: if a publication contributes 30 rows with
-   one formulation family and one printing setup, those 30 rows will sit
-   together and the algorithm will call it a cluster. Agreement between the
-   partition and DOI is measured directly, against agreement with tissue and
-   with material class for comparison.
-
-2. Imputation artefacts. Substrate and syringe temperature are unreported in
-   58% and 52% of samples and are filled with a single constant, so those two
-   columns contain a large artificial spike at 22 C. If clusters are partly
-   tracking "did this study report a temperature", dropping the columns will
-   move the partition. The clustering is rerun without them and the two
-   labellings compared.
-
-Neither test can be passed or failed on its own - they produce numbers that
-have to be reported alongside the clusters.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -48,7 +21,6 @@ MATRIX = cfg.step_dir("02_preprocessing", "tables") / "feature_matrix.parquet"
 
 
 def dominant_material_class(df, columns) -> pd.Series:
-    """Label each sample by the class of the biomaterial it contains most of."""
     tax = load_taxonomy().set_index("column")["material_class"]
     bio = df[columns.biomaterials]
     top = bio.idxmax(axis=1)
@@ -56,11 +28,6 @@ def dominant_material_class(df, columns) -> pd.Series:
 
 
 def main() -> None:
-    # The revision reports two partitions - k-means k=3 and the nested
-    # bisecting k-means k=4 - so every artefact this script writes has to be
-    # addressable. Without a tag the second profile silently overwrites the
-    # first and the manuscript ends up quoting one partition's numbers under
-    # the other's name.
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--tag", default="",
                     help="suffix identifying the partition, e.g. _k4")
@@ -74,7 +41,6 @@ def main() -> None:
 
     print(f"partition: {bundle['algorithm']} k={bundle['k']}")
 
-    # ── 1. what external label does the partition agree with? ───────────────
     external = {
         "DOI (study)": df["DOI"].astype(str),
         "tissue": modeling_tissue(df).astype(str),
@@ -87,7 +53,6 @@ def main() -> None:
              **cl.agreement(labels, ext)} for name, ext in external.items()]
     agree = pd.DataFrame(rows)
 
-    # How concentrated is each cluster in a single study?
     per_cluster = (pd.DataFrame({"cluster": labels,
                                  "DOI": df["DOI"].astype(str).to_numpy()})
                    .groupby("cluster")["DOI"]
@@ -97,11 +62,6 @@ def main() -> None:
     per_cluster["pct_from_largest_study"] = (
         100 * per_cluster["largest_study"] / per_cluster["n_rows"])
 
-    # ── 2. do the constant-filled temperature columns drive the partition? ──
-    # The test means nothing without a baseline. k-means at this k does not
-    # return the same partition twice, so "removing the columns changed the
-    # answer" has to be read against how much a reseed changes it, and against
-    # removing the same number of arbitrary columns.
     make = cl.algorithms()[bundle["algorithm"]]
     k = bundle["k"]
     temp = [c for c in matrix.columns if "Temperature" in c]

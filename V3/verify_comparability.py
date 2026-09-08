@@ -1,32 +1,3 @@
-"""
-Prove that ML, deep learning and the foundation models share partitions
-=======================================================================
-
-    python verify_comparability.py
-
-The three families are benchmarked by three separate scripts, each of which
-resolves its own folds. That is a latent hazard: nothing stops one of them from
-drifting - a different seed, a different split function, a stray `test_size` -
-and the failure is silent. The numbers would still be produced, the tables would
-still line up, and the ML-vs-DL comparison in the paper would simply be wrong.
-
-The submitted manuscript already carries the milder version of this problem. It
-evaluated conventional ML on an 80:20 split and the neural models on 70:15:15,
-and its own Discussion concedes the consequence: comparisons between the groups
-"should be interpreted as benchmark-level comparisons rather than strictly
-identical test-split comparisons". The revision claims something stronger - that
-every model was scored on the same rows - so that claim has to be checkable.
-
-This script imports each stage's own fold resolver, by the same path its
-workers use, and asserts that for every (task, protocol) all three return:
-
-  * identical training row indices
-  * identical test row indices
-  * the same preprocessor cache key, and therefore the same fitted transformer
-
-Exit code is non-zero on any mismatch, so it can gate a release.
-"""
-
 from __future__ import annotations
 
 import importlib.util
@@ -54,7 +25,6 @@ STAGES = {
 
 
 def load_resolver(label: str, path: Path):
-    """Import a stage module and hand back its get_folds, as its workers see it."""
     spec = importlib.util.spec_from_file_location(
         f"_stage_{abs(hash(label))}", path)
     module = importlib.util.module_from_spec(spec)
@@ -127,8 +97,6 @@ def main() -> int:
                                     f"different preprocessor cache key")
                     ok = False
 
-            # A test partition that lost a class makes macro F1 incomparable
-            # across tasks, so it is worth failing loudly rather than noting.
             test_classes = set(np.unique(y.to_numpy()[ref.test_idx]).tolist())
             all_classes = set(np.unique(y.to_numpy()).tolist())
             if test_classes != all_classes:

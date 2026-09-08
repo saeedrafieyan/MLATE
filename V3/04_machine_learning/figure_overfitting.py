@@ -1,29 +1,3 @@
-"""
-Training-minus-test gap: what kind of failure is this?
-======================================================
-
-    python 04_machine_learning/figure_overfitting.py
-
-A test score alone cannot distinguish two failures that call for opposite
-remedies:
-
-  low test, low train    the model could not learn the task from these
-                         features at all - more studies will not help, better
-                         descriptors might
-  low test, high train   the model learned structure that is real inside the
-                         training partition but does not transfer - under the
-                         study-grouped protocol that structure is the study
-                         itself, and more diverse studies is exactly the fix
-
-The gap separates them, and under grouping it is the quantity the paper's
-argument turns on: the manuscript claims the grouped drop reflects dataset
-coverage rather than model capability, and this figure is where that claim is
-either visible or not.
-
-Training scores are a diagnostic and never a result. They appear here, labelled
-as such, and nowhere in the headline tables.
-"""
-
 from __future__ import annotations
 
 import argparse

@@ -1,30 +1,3 @@
-"""
-Conventional-ML benchmark figures
-=================================
-
-    python 04_machine_learning/figures.py
-
-One figure per target, all thirty-three models in a single tall panel sorted by
-random-split weighted F1, with the full metric panel beside it under both
-protocols.
-
-Why one tall panel rather than a family split
----------------------------------------------
-Splitting the field into two stacked panels by family would let each half use a
-larger row height, but it also destroys the single ranking that makes the
-figure worth drawing: a reader could no longer see that a naive Bayes model
-outranks four ensembles under study grouping without comparing across panels.
-The ranking IS the result, so the field stays in one column and the family
-information is carried by the colour rug instead.
-
-Every heatmap cell carries its value, as in the step-05 figure. That is 434
-numbers on one page, which is dense - but the alternative, colour alone, forces
-a reader to the supplementary tables for any actual comparison. The row height
-is raised instead so the glyphs stay above 4 pt, which keeps them legible at
-print size; the answer to Referee 1's "very small text" is a taller figure, not
-fewer numbers.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -81,8 +54,6 @@ def main() -> None:
         cell = board[board["task"] == task]
         if cell.empty:
             continue
-        # The baseline is a reference line, not a competitor, so it is removed
-        # from the ranked field and drawn as a rule instead.
         base = {r.protocol: r.weighted_f1
                 for r in cell[cell["model"] == BASELINE_MODEL].itertuples()}
         ranked = cell[~cell["model"].str.startswith("Dummy")]

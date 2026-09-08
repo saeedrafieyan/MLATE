@@ -1,23 +1,3 @@
-"""
-What is in each cluster
-=======================
-
-    python 03_clustering/characterise.py
-
-Turns the partition into something a reader can name. For each cluster:
-
-  composition    the biomaterials most over-represented relative to the corpus,
-                 by prevalence ratio rather than raw prevalence - alginate is
-                 common everywhere, so listing the most frequent materials would
-                 return the same list for every cluster.
-  context        tissue, cell line and cellular/acellular breakdown.
-  process        median printing parameters, computed on reported values only so
-                 that a cluster's median is not just the global fill value.
-  outcome        Printability and Cell Response distributions.
-
-Outcome columns are described here, never used to form the clusters.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -34,15 +14,10 @@ from mlate.dataset import load_dataset, load_taxonomy, modeling_tissue
 
 TABLES = cfg.step_dir("03_clustering", "tables")
 TOP_N = 6
-MIN_PREVALENCE = 0.10      # ignore materials present in <10% of a cluster
+MIN_PREVALENCE = 0.10
 
 
 def main() -> None:
-    # The revision reports two partitions - k-means k=3 and the nested
-    # bisecting k-means k=4 - so every artefact this script writes has to be
-    # addressable. Without a tag the second profile silently overwrites the
-    # first and the manuscript ends up quoting one partition's numbers under
-    # the other's name.
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--tag", default="",
                     help="suffix identifying the partition, e.g. _k4")
@@ -62,8 +37,6 @@ def main() -> None:
         idx = rows.index
         present = bio.loc[idx].mean()
 
-        # Enrichment against the corpus, restricted to materials that actually
-        # appear in this cluster often enough to describe it.
         ratio = (present / overall.replace(0, np.nan)).replace(
             [np.inf, -np.inf], np.nan)
         ratio = ratio[present >= MIN_PREVALENCE].dropna().nlargest(TOP_N)
@@ -103,15 +76,12 @@ def main() -> None:
     summary = pd.DataFrame(summary)
     markers = pd.DataFrame(markers)
 
-    # Target distribution as counts, for the stacked bars in the figure.
     dist = (pd.crosstab(df["cluster"], df["Printability"])
             .rename(columns=lambda v: f"printability_{v}"))
     cell = df[df[columns.cell_line] != cfg.ACELLULAR_TOKEN]
     dist = dist.join(pd.crosstab(cell["cluster"], cell["Cell Response"])
                      .rename(columns=lambda v: f"cell_response_{v}")).fillna(0)
 
-    # Prevalence of every material in every cluster, so a figure can show a
-    # chosen material across all clusters instead of only where it ranked.
     prevalence = (bio.groupby(df["cluster"]).mean().T * 100)
     prevalence.index.name = "biomaterial"
 

@@ -1,15 +1,3 @@
-"""
-MLATE V3 — verification of every published figure and table
-===========================================================
-
-Recomputes each reported quantity straight from the dataset and compares it
-with what the tables actually contain, and with the values the figure code
-would have plotted. Nothing here imports numbers from the figure scripts, so a
-bug in explore_dataset.py cannot hide itself.
-
-    python verify_outputs.py     ->  prints PASS / FAIL per check, exits 1 on any FAIL
-"""
-
 from __future__ import annotations
 
 import sys
@@ -49,7 +37,6 @@ def main() -> int:
     s3 = pd.read_excel(t_dir / "tableS3_tissue_composition.xlsx")
     summ = pd.read_excel(t_dir / "table_dataset_summary.xlsx")
 
-    # ── dataset integrity ───────────────────────────────────────────────────
     check("dataset shape 2646 x 148", df.shape == (2646, 148), str(df.shape))
     check("no missing targets",
           int(df[["Printability", "Cell Response"]].isna().sum().sum()) == 0)
@@ -65,7 +52,6 @@ def main() -> int:
     check("Cell Response in 1..5",
           set(df["Cell Response"].unique()) <= {1, 2, 3, 4, 5})
 
-    # ── cell-line vocabulary actually applied ───────────────────────────────
     present = set(df["Cell Line"])
     merged_away = set(syn.loc[syn["action"] == "merge", "raw_name"]) - {
         "chondrocyteyte"}
@@ -78,14 +64,12 @@ def main() -> int:
     check("no cell line has stray whitespace",
           all(v == v.strip() and " " not in v for v in present))
 
-    # ── taxonomy ────────────────────────────────────────────────────────────
     check("taxonomy covers exactly the biomaterial columns",
           set(tax["column"]) == set(bio),
           f"sym-diff {sorted(set(tax['column']) ^ set(bio))[:3]}")
     check("taxonomy has no unassigned class", tax["material_class"].notna().all())
     check("taxonomy row count == 130", len(tax) == 130, str(len(tax)))
 
-    # ── Table S1: biomaterial statistics ────────────────────────────────────
     check("Table S1 row count == 130", len(s1) == 130, str(len(s1)))
     bad = []
     for _, r in s1.iterrows():
@@ -106,7 +90,6 @@ def main() -> int:
           int(s1["Samples"].sum()) ==
           int((df[bio].fillna(0) != 0).sum().sum()))
 
-    # ── Table S2: cell lines ────────────────────────────────────────────────
     cellular = df[df["Cell Line"] != ACELLULAR]
     check("Table S2 row count == unique cellular lines",
           len(s2) == cellular["Cell Line"].nunique(),
@@ -121,7 +104,6 @@ def main() -> int:
     check("Table S2 top-3 ordering matches", top_tbl == top_dat,
           f"{top_tbl} vs {top_dat}")
 
-    # ── Table S3: tissue composition ────────────────────────────────────────
     check("Table S3 samples sum to dataset size",
           int(s3["Samples"].sum()) == len(df),
           f"{int(s3['Samples'].sum())} vs {len(df)}")
@@ -133,7 +115,6 @@ def main() -> int:
     check("Table S3 bioprinted <= samples per tissue",
           bool((s3["Bioprinted"] <= s3["Samples"]).all()))
 
-    # ── summary table ───────────────────────────────────────────────────────
     want = {
         "Samples": len(df),
         "Studies (unique DOI)": df["DOI"].nunique(),
@@ -148,7 +129,6 @@ def main() -> int:
     check("summary cell-line count excludes nothing by accident",
           got.get("Cell lines") == df["Cell Line"].nunique())
 
-    # ── figure inputs (recomputed independently of the figure code) ─────────
     n_bio = int((df["Cell Line"] != ACELLULAR).sum())
     check("Fig 3A split sums to the dataset", n_bio + (len(df) - n_bio) == len(df))
     p_counts = df["Printability"].value_counts()
@@ -166,7 +146,6 @@ def main() -> int:
     sib = sum(k * (1 - 0.8 ** (k - 1)) for k in per) / len(df)
     check("Fig S6C sibling fraction in 0-1", 0 <= sib <= 1, f"{sib:.3f}")
 
-    # ── every figure file exists in both formats ────────────────────────────
     expected = [
         "fig1_dataset_growth", "fig2_biomaterial_taxonomy", "fig3_overview",
         "fig4_tissue_composition", "fig7_material_classes",
@@ -181,7 +160,6 @@ def main() -> int:
             if p.stat().st_size < 20_000]
     check("no figure is suspiciously small", not tiny, str(tiny))
 
-    # ── step 02: two-tier fill ──────────────────────────────────────────────
     from mlate.dataset import column_groups
     from mlate.imputation import fill_within_study
     columns = column_groups(df)
@@ -220,7 +198,6 @@ def main() -> int:
               m.shape == (len(df), width), str(m.shape))
         check(f"{name} has no NaN", bool(m.notna().all().all()))
 
-    # ── step 03: clustering ─────────────────────────────────────────────────
     import joblib
     ctab = cfg.step_dir("03_clustering", "tables")
     cmod = cfg.step_dir("03_clustering", "models")
@@ -255,7 +232,6 @@ def main() -> int:
     else:
         check("step 03 has been run", False, str(assign_path))
 
-    # ── step 04: supervised benchmark ───────────────────────────────────────
     from mlate import models as zoo
     mtab = cfg.step_dir("04_machine_learning", "tables")
     bench = mtab / "model_benchmark.xlsx"
@@ -280,7 +256,6 @@ def main() -> int:
               bool(((board["macro_f1"] >= board["macro_f1_lo"] - 1e-9)
                     & (board["macro_f1"] <= board["macro_f1_hi"] + 1e-9)).all()))
 
-        # Every out-of-fold scheme must score each sample exactly once.
         for f in sorted(preds_dir.glob("*.parquet")):
             task, protocol = f.stem.split("__")
             pr = pd.read_parquet(f)
@@ -289,12 +264,6 @@ def main() -> int:
             check(f"{task}/{protocol}: no sample scored twice per model",
                   bool((per_model["size"] == per_model["nunique"]).all()))
             if protocol == "doi":
-                # The grouped protocol is the paper's central claim; a single
-                # shared study between train and test would invalidate it.
-                # Training rows are this task's rows minus the fold's test
-                # rows, not the whole dataset minus them: cell_response_cellular
-                # uses 1,027 of 2,646 rows, and the excluded acellular rows
-                # share studies with the test set without ever being trained on.
                 joined = pr.join(df["DOI"], on="row")
                 task_rows = set(pr["row"])
                 bad = 0
@@ -308,7 +277,6 @@ def main() -> int:
     else:
         check("step 04 has been run", False, str(bench))
 
-    # ── report ──────────────────────────────────────────────────────────────
     width = max(len(n) for _, n, _ in results)
     n_fail = 0
     for ok, name, detail in results:

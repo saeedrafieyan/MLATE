@@ -1,56 +1,3 @@
-"""
-Nested hyper-parameter tuning for the tabular deep-learning architectures
-========================================================================
-
-    python 05_deep_learning/tuning_dl.py --dry-run
-    python 05_deep_learning/tuning_dl.py
-    python 05_deep_learning/tuning_dl.py --models MLP ResNet --protocols doi
-
-Same contract as step 04: the same folds, the same fold-fitted preprocessor,
-out-of-fold predictions in the same schema, three winners per search, per-unit
-checkpoints, resume on restart. The submitted manuscript evaluated conventional
-ML on an 80:20 split and the neural models on 70:15:15, and conceded in its own
-Discussion that the two groups were therefore only comparable "as
-benchmark-level comparisons". Sharing the folds removes that caveat.
-
-Design
-------
-The evaluation follows step 04 exactly: one 80:20 train/test partition per
-protocol, shared by both targets and by all three model families, with model
-selection happening strictly inside the training partition. Under `--design
-holdout` that is 6 architectures x 2 tasks x 2 protocols = 24 units.
-
-Selection inside the training partition uses a single validation holdout rather
-than a 10-fold inner CV, which is where the deep models differ from step 04.
-The reason is cost: a decision tree fits in milliseconds and a network does
-not, so a 10-fold inner loop would multiply an already GPU-bound search by ten
-for a selection step, not for the reported estimate. A validation holdout is
-the standard arrangement for deep models and is what the submitted pipeline
-used - its 70:15:15 split is exactly a train/validation/test holdout.
-
-The validation split inherits the protocol's grouping: under `doi` it is split
-on whole studies, so a configuration is never selected using a study it will be
-scored on.
-
-`verify_comparability.py` asserts that this module, step 04 and the foundation
-models all resolve identical partitions. Run it after touching any of them.
-
-Devices
--------
-These networks belong on the GPU - unlike the tree ensembles in step 04, which
-measured 3-31x SLOWER on CUDA. The models are small (hidden <= 512 over 153
-features, 2,378 rows), so one training uses a fraction of a card and several
-run concurrently per GPU. Units are assigned to devices round-robin.
-
-Pruning
--------
-Epoch-level, against the validation macro F1 reported after every epoch. This
-is a different granularity from step 04, which prunes on per-fold scores and
-uses a Wilcoxon signed-rank test over paired folds - that test needs
-independent paired observations, which epochs of one training are not. A median
-pruner over the epoch curve is the right instrument here.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -96,7 +43,6 @@ PARAMS = TUNING / "params"
 
 
 def configure(args) -> str:
-    """Checkpoints live under a directory keyed by the run configuration."""
     global UNITS, PARAMS
     payload = {"trials": args.trials, "val_fraction": args.val_fraction,
                "patience": args.patience, "objective": args.objective,
@@ -114,14 +60,6 @@ def configure(args) -> str:
 
 
 def get_folds(sub, y, protocol: str, design: str):
-    """
-    Outer partition(s), resolved exactly as step 04 resolves them.
-
-    This must stay identical to `04_machine_learning/tuning.py:get_folds`, or
-    the deep models are scored on different test rows from the conventional
-    ones and the ML-vs-DL comparison the shared-fold design exists to enable
-    silently stops being valid.
-    """
     if design == "holdout":
         return splits.make_holdout(sub, y, protocol)
     return splits.make_folds(sub, y, protocols=(protocol,))
@@ -138,14 +76,6 @@ def _score(y_true, y_pred, metric: str) -> float:
 
 def inner_holdout(protocol: str, y: np.ndarray, groups: np.ndarray,
                   val_fraction: float):
-    """
-    One validation split carved from the outer training partition.
-
-    Grouped protocols split on whole studies so the validation set contains no
-    publication the training set has seen; the alternative would select
-    hyper-parameters using rows from studies the model is about to be scored
-    on, which is the error the grouped protocol exists to prevent.
-    """
     idx = np.arange(len(y))
     if protocol in ("doi", "tissue"):
         gss = GroupShuffleSplit(n_splits=1, test_size=val_fraction,
@@ -155,9 +85,6 @@ def inner_holdout(protocol: str, y: np.ndarray, groups: np.ndarray,
         sss = StratifiedShuffleSplit(n_splits=1, test_size=val_fraction,
                                      random_state=cfg.RANDOM_STATE)
         tr, va = next(sss.split(idx, y))
-    # A validation split that lost a class makes macro F1 meaningless; fall
-    # back to a stratified split rather than reporting a metric over 4 classes
-    # where the task has 5.
     if len(np.unique(y[va])) < len(np.unique(y)):
         sss = StratifiedShuffleSplit(n_splits=1, test_size=val_fraction,
                                      random_state=cfg.RANDOM_STATE)
@@ -168,7 +95,6 @@ def inner_holdout(protocol: str, y: np.ndarray, groups: np.ndarray,
 def tune(arch: str, Xtr, ytr, groups, protocol: str, n_trials: int,
          val_fraction: float, patience: int, objective: str, n_classes: int,
          device: str):
-    """Search `arch` inside one outer training partition. Returns (winners, stats)."""
     tr, va = inner_holdout(protocol, ytr, groups, val_fraction)
     Xa, ya, Xb, yb = Xtr[tr], ytr[tr], Xtr[va], ytr[va]
     others = [m for m in SELECTION_METRICS if m != objective]
@@ -230,7 +156,6 @@ def run_unit(task: str, protocol: str, arch: str, fold_index: int,
              n_trials: int, val_fraction: float, patience: int,
              objective: str, device: str, units_dir: str,
              params_dir: str, design: str) -> dict:
-    """One (architecture, task, protocol, outer fold) job."""
     units = Path(units_dir)
     params_out = Path(params_dir)
     optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -259,9 +184,6 @@ def run_unit(task: str, protocol: str, arch: str, fold_index: int,
                               val_fraction, patience, objective, len(labels),
                               device)
 
-        # Refit each winner on the WHOLE outer training partition, using its
-        # own inner holdout only for early stopping. The test fold is never
-        # touched until prediction.
         tr, va = inner_holdout(protocol, ytr, doi, val_fraction)
         unseen = splits.unseen_material_mask(sub, fold, columns.biomaterials)
         blocks, recorded, histories = [], {}, []
@@ -269,11 +191,6 @@ def run_unit(task: str, protocol: str, arch: str, fold_index: int,
             model, info = deep.train(arch, params, Xtr[tr], ytr[tr],
                                      Xtr[va], ytr[va], len(labels), device,
                                      patience=patience)
-            # Both partitions. Training scores are a diagnostic, never a
-            # result: the train-test gap is what distinguishes a network that
-            # could not learn the task from one that memorised study-specific
-            # structure, and under the grouped protocol that is the paper's
-            # argument. Downstream scoring must filter split == "test".
             partitions = {
                 "test": (Xte, yte, sub.index.to_numpy()[fold.test_idx],
                          unseen),
@@ -297,10 +214,6 @@ def run_unit(task: str, protocol: str, arch: str, fold_index: int,
                     block[f"p_{c}"] = proba[:, i]
                 blocks.append(block)
 
-            # The per-epoch curve is the source for the supplementary's
-            # train-vs-validation loss figure. It is computed during training
-            # anyway; discarding it would mean refitting every network just to
-            # redraw one figure.
             hist = pd.DataFrame(info.get("history", []))
             if len(hist):
                 hist.insert(0, "selection", selection)
@@ -355,14 +268,6 @@ TASK_LABELS = {"printability": [0, 1, 2, 3],
 
 
 def score(allp: pd.DataFrame) -> pd.DataFrame:
-    """
-    The same sixteen-metric panel step 04 reports, pooled over folds.
-
-    Scoring lives here rather than being left to a separate script so that a
-    deep-learning run is not silently the only stage that produces predictions
-    nobody has scored. Pooled, not mean-of-folds: out-of-fold predictions are
-    concatenated and scored once, so every sample counts equally.
-    """
     from mlate import evaluation as ev
 
     rows = []
@@ -407,8 +312,6 @@ def aggregate() -> None:
     board.round(4).to_excel(TABLES / "dl_benchmark.xlsx", index=False)
     print(f"  {'dl_benchmark.xlsx':40s} {len(board):>8,} rows")
     pd.set_option("display.width", 220)
-    # Test partition only, and one selection, or the console dump is four
-    # times the size and invites reading a training score as a result.
     from mlate import style as ms
 
     lead = "weighted" if "weighted" in set(board["selection"]) else \
@@ -471,9 +374,6 @@ def main() -> None:
 
     resources.claim()
     devices = resources.devices()
-    # These networks are small enough that one training uses a fraction of a
-    # card; several per GPU keeps the device busy. Too many and they contend
-    # for SM time and VRAM, so this is deliberately modest.
     workers = args.workers or max(1, 4 * len(devices))
 
     df, columns = load_dataset()
@@ -509,16 +409,6 @@ def main() -> None:
         return
 
     t0 = time.perf_counter()
-    # batch_size=1 is essential, not a tuning knob. joblib defaults to
-    # batch_size="auto", which groups short tasks together to amortise
-    # dispatch overhead. Most units here are cheap, so joblib grows the
-    # batch - and then a single worker can receive one pathological
-    # unit with sixty cheap ones queued BEHIND it, while every other
-    # worker drains its batch and exits. Observed exactly that: one
-    # worker at 16.9 CPU-hours on a single SVM fit, 53 workers gone,
-    # 67 cheap units never dispatched, 63 cores idle overnight.
-    # Batching also silently defeats the longest-first ordering that
-    # mlate/scheduling.py exists to compute.
     out = Parallel(n_jobs=workers, backend="loky", verbose=0,
                    batch_size=1)(
         delayed(run_unit)(t, p, m, k, args.trials, args.val_fraction,

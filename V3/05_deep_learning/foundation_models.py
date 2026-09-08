@@ -1,54 +1,3 @@
-"""
-Tabular foundation models: TabPFN and TabICL
-============================================
-
-    python 05_deep_learning/foundation_models.py --dry-run
-    python 05_deep_learning/foundation_models.py
-    python 05_deep_learning/foundation_models.py --models TabPFN --protocols doi
-
-Both models are pre-trained transformers that classify by in-context learning:
-the training rows are supplied as context at inference time and the weights are
-never updated on our data. There is therefore nothing to tune - which is why
-this step has no search - but everything else matches step 04 and the deep
-models: the same folds, the same fold-fitted preprocessor, out-of-fold
-predictions in the same schema, per-unit checkpoints and resume.
-
-Study grouping still applies, and that is worth stating plainly because the
-opposite is easy to assume. The weights never saw this corpus, but the
-*prediction* still conditions on whatever training rows are placed in the
-context window. If a test row's own publication sits in that context, the model
-can match against it exactly as a fitted model would - the mechanism is
-attention over provided examples rather than memorised parameters, but the
-information available is identical. Running both protocols turns that into a
-measurement rather than an assumption: if in-context learning were immune to
-study structure, the random and grouped scores would coincide.
-
-Access tokens
--------------
-TabICL downloads its weights unauthenticated. **TabPFN 2.6 does not** - it
-requires a Prior Labs account token before it will fetch a checkpoint, and
-without one it opens a browser, starts a localhost callback server and blocks
-on stdin. In a script that surfaces as
-
-    OSError: [WinError 10038] An operation was attempted on something that
-             is not a socket
-
-which reads like a multiprocessing fault and is nothing of the kind. Put the
-token in 05_deep_learning/.env (any of the key spellings in TOKEN_KEYS, case
-insensitive) or in the environment; apply_token_env() exports it as
-TABPFN_TOKEN and sets TABPFN_NO_BROWSER so a missing token fails loudly instead
-of hanging.
-
-A token must never be written into a source file. The submitted repository's
-transformer_benchmark.py carries a live JWT on line 24; that one has since
-expired, and any token committed to a public repository should be treated as
-compromised and rotated regardless.
-
-Reproducibility note for the Methods: this step therefore needs an account,
-unlike every other step in the repository. Worth one sentence, since Referee 1
-comment 4 is about a reader being able to reproduce the work.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -79,35 +28,16 @@ PREDS = TABLES / "predictions_foundation"
 
 PROTOCOLS = ("random", "doi")
 N_ESTIMATORS = 8
-# The exact TabPFN checkpoint, so the manuscript can name the model that
-# produced the numbers. This must be a filename the package offers, not a
-# version string: `model_path="v2.6"` raises
-#   ValueError: Model v2.6 not found in available models:
-#       ['tabpfn-v2.6-classifier-v2.6_default.ckpt']
-# Passing None would take the default, but then a future default silently
-# changes the results.
 MODEL_VERSION = "tabpfn-v2.6-classifier-v2.6_default.ckpt"
 DEFAULT_MODELS = ("TabPFN", "TabPFN (thinking)", "TabICL")
 
 
-# Where a token may live, and what it may be called. Both lists are searched
-# because a token is easy to put in a reasonable place that the loader does not
-# happen to check, and a silently-missing token degrades to a different code
-# path rather than to an error - which is the worst way for this to fail.
 ENV_FILES = (Path(__file__).resolve().parent / ".env", cfg.ROOT / ".env")
 TOKEN_KEYS = ("TABPFN_TOKEN", "TABPFN_ACCESS_TOKEN", "PRIORLABS_TOKEN",
               "PRIOR_LABS_TOKEN")
 
 
 def token() -> str | None:
-    """
-    Hosted-API token, from the environment or an uncommitted .env.
-
-    Never from a source file: the submitted repository's
-    transformer_benchmark.py carries a live JWT on line 24, which is exactly
-    the failure this function exists to avoid. Key matching is
-    case-insensitive because .env files are written by people.
-    """
     for key in TOKEN_KEYS:
         value = os.environ.get(key)
         if value:
@@ -128,7 +58,6 @@ def token() -> str | None:
 
 
 def token_status() -> str:
-    """Describe the token without ever revealing it."""
     tok = token()
     if not tok:
         return "not set - using locally downloaded weights"
@@ -136,25 +65,6 @@ def token_status() -> str:
 
 
 def apply_token_env() -> bool:
-    """
-    Put the token where TabPFN looks for it, and stop it opening a browser.
-
-    TabPFN 2.6 will not download its weights unauthenticated. Without
-    TABPFN_TOKEN it starts an interactive login - it opens a browser, spins up
-    a callback server on localhost, and blocks on stdin waiting for an API key
-    pasted by hand. In any non-interactive process that collapses into
-
-        OSError: [WinError 10038] An operation was attempted on something
-                 that is not a socket
-
-    which looks like a multiprocessing fault and is not one. Reading the token
-    is not enough; it has to be exported, and TABPFN_NO_BROWSER has to be set
-    so a failure surfaces as an error rather than as a process hanging on a
-    login prompt no one can see.
-
-    Called in the parent and again inside each worker, because a worker that
-    somehow starts without it would hang rather than fail.
-    """
     tok = token()
     os.environ.setdefault("TABPFN_NO_BROWSER", "1")
     if tok:
@@ -164,29 +74,10 @@ def apply_token_env() -> bool:
 
 
 def build(name: str, device: str):
-    """
-    TabPFN is evaluated in two inference modes.
-
-    "non-thinking" is the default forward pass: one in-context prediction per
-    ensemble member, argmax of the averaged probabilities.
-
-    "thinking" spends additional compute at inference time. TabPFN-3 exposes
-    this through its tuning configuration: it holds out part of the supplied
-    context, calibrates a softmax temperature on it, and searches per-class
-    decision thresholds against a chosen metric. No weights change and no extra
-    data is used - the model reconsiders how to turn its own probabilities into
-    decisions. This is the mode that should matter here, because the plain
-    model ranks well while deciding badly, which is the signature of a
-    threshold problem rather than a signal problem.
-
-    Thresholds are tuned against F1 so the tuning objective matches the metric
-    the paper reports, and the holdout comes from the training context only.
-    """
     if name.startswith("TabPFN"):
         from tabpfn import TabPFNClassifier
         from tabpfn.inference_tuning import ClassifierTuningConfig
         kwargs = dict(device=device, n_estimators=N_ESTIMATORS,
-                      # 153 features exceeds the pre-training shape; permit it.
                       ignore_pretraining_limits=True,
                       model_path=MODEL_VERSION,
                       random_state=cfg.RANDOM_STATE)
@@ -204,7 +95,6 @@ def build(name: str, device: str):
 
 
 def get_folds(sub, y, protocol: str, design: str):
-    """Identical resolution to steps 04 and 05, so all three share test rows."""
     if design == "holdout":
         return splits.make_holdout(sub, y, protocol)
     return splits.make_folds(sub, y, protocols=(protocol,))
@@ -219,7 +109,6 @@ def safe_key(task: str, protocol: str, model: str, fold_index: int) -> str:
 
 def run_unit(task: str, protocol: str, model: str, fold_index: int,
              device: str, units_dir: str, design: str) -> dict:
-    """One (model, task, protocol, fold) job. Writes its own checkpoint."""
     units = Path(units_dir)
     apply_token_env()
     key = safe_key(task, protocol, model, fold_index)
@@ -243,10 +132,6 @@ def run_unit(task: str, protocol: str, model: str, fold_index: int,
         clf.fit(Xtr, ytr)
 
         unseen = splits.unseen_material_mask(sub, fold, columns.biomaterials)
-        # In-context "training" performance means predicting the very rows
-        # supplied as context, so it is an upper bound of a different kind
-        # from a fitted model's training score. It is recorded for consistency
-        # with steps 04 and 05, and is a diagnostic only.
         partitions = {
             "test": (Xte, yte, sub.index.to_numpy()[fold.test_idx], unseen),
             "train": (Xtr, y.to_numpy()[fold.train_idx],
@@ -296,17 +181,12 @@ def aggregate(df) -> None:
         print(f"  {out.name:40s} {len(g):>8,} predictions  "
               f"{g['model'].nunique()} models  {g['fold'].nunique():2d} folds")
 
-    # Pooled scoring, matching step 04: concatenate out-of-fold predictions and
-    # score once, rather than averaging per-fold scores.
     pooled = []
     for (model, task, protocol, split), g in allp.groupby(
             ["model", "task", "protocol", "split"]):
         labels = sorted(pd.unique(target_frame(df, task)[1]))
         pcols = [f"p_{c}" for c in labels]
         proba = g[pcols].to_numpy(float) if all(c in g for c in pcols) else None
-        # `selection` is carried even though nothing is selected here: steps 04
-        # and 05 both emit it, and a downstream table that filters on it would
-        # silently drop every foundation-model row if this column were absent.
         pooled.append({"model": model, "task": task, "protocol": protocol,
                        "selection": "zero_shot", "split": split,
                        "n_scored": len(g), "n_folds": g["fold"].nunique(),
@@ -315,11 +195,6 @@ def aggregate(df) -> None:
     with pd.ExcelWriter(TABLES / "foundation_models.xlsx") as xl:
         pooled.round(4).to_excel(xl, sheet_name="pooled", index=False)
 
-    # Everything below is TEST ONLY. Filtering here is not cosmetic: the table
-    # carries a train row per model, and a pivot_table over an unfiltered frame
-    # silently AVERAGES train and test into one number that is neither. That
-    # produced a protocol-gap table where TabICL/cell_response read 0.592,
-    # exactly the mean of its 0.392 test and 0.792 train macro F1.
     from mlate import style as ms
 
     test = pooled[pooled["split"] == "test"] if "split" in pooled.columns \
@@ -365,9 +240,6 @@ def main() -> None:
 
     resources.claim()
     devices = resources.devices()
-    # Foundation models hold a large transformer plus the whole training set as
-    # context on the device, so far fewer fit per card than the small networks
-    # in tuning_dl.py.
     workers = args.workers or max(1, 2 * len(devices))
     have = apply_token_env()
     print(f"TabPFN token: {token_status()}")
@@ -401,16 +273,6 @@ def main() -> None:
         return
 
     t0 = time.perf_counter()
-    # batch_size=1 is essential, not a tuning knob. joblib defaults to
-    # batch_size="auto", which groups short tasks together to amortise
-    # dispatch overhead. Most units here are cheap, so joblib grows the
-    # batch - and then a single worker can receive one pathological
-    # unit with sixty cheap ones queued BEHIND it, while every other
-    # worker drains its batch and exits. Observed exactly that: one
-    # worker at 16.9 CPU-hours on a single SVM fit, 53 workers gone,
-    # 67 cheap units never dispatched, 63 cores idle overnight.
-    # Batching also silently defeats the longest-first ordering that
-    # mlate/scheduling.py exists to compute.
     out = Parallel(n_jobs=workers, backend="loky", verbose=0,
                    batch_size=1)(
         delayed(run_unit)(t, p, m, k, devices[i % len(devices)],

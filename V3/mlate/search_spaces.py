@@ -1,48 +1,3 @@
-"""
-Hyper-parameter search spaces
-=============================
-
-One Optuna space per entry in the registry, so the tuned benchmark covers the
-same 33 models as the untuned one and a model cannot be searched over different
-ranges in two scripts.
-
-Provenance
-----------
-Twenty-seven spaces are transcribed from the submitted pipeline
-(`classification_pipeline.py`), unchanged in range, so the tuned numbers here
-are comparable with the ones already reported rather than with a space of our
-own choosing. Four are new because the registry carries models the submitted
-pipeline did not: SVC with an RBF and a polynomial kernel, and the two
-meta-ensembles. Two are deliberately absent - see BASELINES below.
-
-Constrained variants
---------------------
-The registry carries paired entries that differ by exactly one setting:
-Logistic Regression / (balanced), Random Forest / (balanced), and k-NN /
-(distance weighted). The submitted pipeline searched `class_weight` and
-`weights` freely, which would collapse each pair into two draws from one space
-and report the same search twice under different names. Here the distinguishing
-setting is PINNED per variant and removed from the space, so each pair is two
-constrained searches whose difference is the thing the pair exists to show.
-
-BASELINES
----------
-The two dummies are not tunable. `strategy` is not a hyper-parameter of
-DummyClassifier, it is the definition of which baseline it is - searching it
-would let "Dummy (majority)" silently become "Dummy (stratified)" and destroy
-the constant-prediction reference every accuracy figure is read against. They
-are carried into the tuned tables at their untuned scores.
-
-Conditional parameters
-----------------------
-Several estimators reject otherwise-valid combinations (RandomForest's
-`max_samples` without bootstrap, CatBoost's `bagging_temperature` outside
-Bayesian bootstrap). Optuna suggests the parameter regardless, so the trial is
-reproducible from its params dict, and `build_tuned` drops it at construction
-time. Resolving it inside the space instead would make the recorded params
-disagree with the object that was actually fitted.
-"""
-
 from __future__ import annotations
 
 from typing import Callable
@@ -70,24 +25,15 @@ from mlate import config as cfg
 
 SEED = cfg.RANDOM_STATE
 
-# Models carried through untuned. See BASELINES in the module docstring.
 BASELINES = ("Dummy (majority)", "Dummy (stratified)")
 
-# Built from other models' tuned parameters rather than from a space of their
-# own; the tuner runs them in a second wave. See build_meta().
 META = ("Soft Voting (RF+XGB+LR)", "Stacking (RF+XGB+LR -> LR)")
 
-# Tuples do not survive Optuna's storage round-trip, so layer shapes are
-# searched as strings and mapped back at construction. Same device the
-# submitted pipeline used.
 _MLP_LAYERS = {
     "64": (64,), "128": (128,), "256": (256,),
     "128_64": (128, 64), "256_128": (256, 128), "256_128_64": (256, 128, 64),
 }
 
-
-# ── spaces ──────────────────────────────────────────────────────────────────
-# Each returns the raw params dict for one trial. Nothing is constructed here.
 
 def _logistic(t) -> dict:
     return {
@@ -112,8 +58,6 @@ def _ridge(t) -> dict:
 
 
 def _sgd(t) -> dict:
-    # loss is pinned to hinge: the registry entry is "SGD (hinge)", and letting
-    # the search pick log_loss would turn it into a different classifier.
     return {
         "penalty": t.suggest_categorical("penalty", ["l2", "l1", "elasticnet"]),
         "alpha": t.suggest_float("alpha", 1e-6, 1e-1, log=True),
@@ -165,8 +109,6 @@ def _perceptron(t) -> dict:
 
 
 def _lda(t) -> dict:
-    # n_components is capped at n_classes-1 by sklearn; it is searched over the
-    # submitted range and clipped at construction against the fold's classes.
     return {
         "shrinkage": t.suggest_categorical("shrinkage",
                                            [None, "auto", 0.1, 0.5, 0.9]),
@@ -176,9 +118,6 @@ def _lda(t) -> dict:
 
 
 def _qda(t) -> dict:
-    # The registry fits QDA behind a PCA because the smallest class has fewer
-    # samples than the 153 features, so the per-class covariances are singular.
-    # The PCA width is therefore part of the model and is searched with it.
     return {
         "pca__n_components": t.suggest_int("pca__n_components", 5, 60),
         "reg_param": t.suggest_float("reg_param", 0.0, 1.0),
@@ -222,9 +161,6 @@ def _nearest_centroid(t) -> dict:
 
 
 def _svc_rbf(t) -> dict:
-    # New. The submitted pipeline carried NuSVC and LinearSVC but no C-SVC with
-    # an RBF kernel, which is what the registry entry is. Ranges follow the
-    # NuSVC entry where they correspond.
     return {
         "C": t.suggest_float("C", 0.01, 100.0, log=True),
         "gamma": t.suggest_categorical("gamma", ["scale", "auto"]),
@@ -271,10 +207,6 @@ def _decision_tree(t) -> dict:
 
 
 def _extra_tree(t) -> dict:
-    # Deliberately not _decision_tree() minus splitter: calling that and
-    # discarding the value still SUGGESTS splitter, so Optuna records a
-    # parameter that cannot affect the fit and the sampler wastes a dimension
-    # modelling it. ExtraTreeClassifier splits at random by definition.
     return {
         "criterion": t.suggest_categorical("criterion",
                                            ["gini", "entropy", "log_loss"]),
@@ -288,8 +220,6 @@ def _extra_tree(t) -> dict:
 
 
 def _random_forest(t) -> dict:
-    # class_weight is absent on purpose: it is what separates the two RF
-    # entries in the registry and is pinned per variant in build_tuned.
     return {
         "n_estimators": t.suggest_int("n_estimators", 100, 500, step=50),
         "criterion": t.suggest_categorical("criterion",
@@ -324,8 +254,6 @@ def _extra_trees(t) -> dict:
 
 
 def _bagging(t) -> dict:
-    # The registry bags decision trees, so the base tree's depth is part of the
-    # model and is searched alongside the ensemble settings.
     return {
         "n_estimators": t.suggest_int("n_estimators", 10, 200),
         "max_samples": t.suggest_float("max_samples", 0.5, 1.0),
@@ -407,12 +335,6 @@ def _lightgbm(t) -> dict:
 
 
 def _catboost(t) -> dict:
-    # iterations capped at 500 rather than the submitted pipeline's 1,000.
-    # Measured: CatBoost is 48% of the entire tuning grid on its own, and its
-    # cost is close to linear in iterations, so the upper half of that range
-    # was buying most of the compute bill. An 800-1,000 iteration model at
-    # depth 10 on 2,378 rows is also comfortably into overfitting, so the
-    # configurations being dropped are ones a fold would not have selected.
     return {
         "iterations": t.suggest_int("iterations", 100, 500),
         "learning_rate": t.suggest_float("learning_rate", 0.005, 0.3, log=True),
@@ -421,14 +343,6 @@ def _catboost(t) -> dict:
         "bagging_temperature": t.suggest_float("bagging_temperature", 0.0, 1.0),
         "random_strength": t.suggest_float("random_strength", 0.0, 10.0),
         "colsample_bylevel": t.suggest_float("colsample_bylevel", 0.5, 1.0),
-        # boosting_type is fixed to Plain rather than searched over
-        # {Plain, Ordered}. Measured on a real fold at 300 iterations, depth 6:
-        # Plain 2.65 s, Ordered 16.10 s - a 6.1x penalty on a categorical drawn
-        # half the time, which by itself made CatBoost roughly half of the
-        # entire tuning grid. Ordered boosting is also unsupported on GPU under
-        # a multiclass loss, so it forecloses that option too. The trade is a
-        # narrower search than the submitted pipeline's, and it must be stated
-        # in the Methods rather than left implicit.
         "bootstrap_type": t.suggest_categorical("bootstrap_type",
                                                 ["Bayesian", "Bernoulli"]),
     }
@@ -440,15 +354,6 @@ def _mlp(t) -> dict:
             "hidden_layer_sizes", list(_MLP_LAYERS)),
         "activation": t.suggest_categorical("activation",
                                             ["relu", "tanh", "logistic"]),
-        # lbfgs is excluded from the submitted pipeline's {adam, sgd, lbfgs}.
-        # It is a full-batch quasi-Newton solver that scikit-learn recommends
-        # only for small datasets, and on this 2,378 x 153 problem it does not
-        # converge: every sampled draw exhausted max_iter, emitting
-        # "lbfgs failed to converge after 965 iteration(s)". Those draws burn
-        # the entire iteration budget to return a non-converged model, which
-        # made MLP the single most expensive entry in the grid. Removing a
-        # solver that never converges removes configurations that could not
-        # have been selected on merit.
         "solver": t.suggest_categorical("solver", ["adam", "sgd"]),
         "alpha": t.suggest_float("alpha", 1e-6, 1e-1, log=True),
         "learning_rate": t.suggest_categorical(
@@ -493,7 +398,6 @@ SPACES: dict[str, Callable] = {
     "MLP (256-128)": _mlp,
 }
 
-# What each paired variant pins, and therefore does not search.
 PINNED: dict[str, dict] = {
     "Logistic Regression": {"class_weight": None},
     "Logistic Regression (balanced)": {"class_weight": "balanced"},
@@ -505,30 +409,17 @@ PINNED: dict[str, dict] = {
 
 
 def suggest(name: str, trial) -> dict:
-    """Draw one trial's parameters for `name`."""
     if name not in SPACES:
         raise KeyError(f"no search space for {name!r}")
     return SPACES[name](trial)
 
 
-# ── construction ────────────────────────────────────────────────────────────
-
 def build_tuned(name: str, params: dict, n_jobs: int = 1,
                 n_classes: int | None = None):
-    """
-    Build one estimator from a trial's parameters.
-
-    Conditional parameters that the estimator would reject are dropped here
-    rather than in the space, so the recorded params always describe the trial
-    that was actually run.
-    """
     p = dict(params)
     p.update(PINNED.get(name, {}))
 
     if name == "Logistic Regression" or name == "Logistic Regression (balanced)":
-        # saga is the only solver in the space that accepts penalty=None with
-        # every configuration; lbfgs and newton-cg accept it too, so nothing is
-        # dropped, but l1_ratio never appears and elasticnet is not offered.
         return LogisticRegression(random_state=SEED, **p)
 
     if name == "Ridge Classifier":
@@ -554,10 +445,8 @@ def build_tuned(name: str, params: dict, n_jobs: int = 1,
         return Perceptron(random_state=SEED, **p)
 
     if name == "Linear Discriminant":
-        # n_components cannot exceed n_classes - 1.
         if n_classes is not None:
             p["n_components"] = min(p["n_components"], max(1, n_classes - 1))
-        # shrinkage is only supported by the lsqr and eigen solvers.
         solver = "lsqr" if p.get("shrinkage") is not None else "svd"
         return LinearDiscriminantAnalysis(solver=solver, **p)
 
@@ -575,8 +464,6 @@ def build_tuned(name: str, params: dict, n_jobs: int = 1,
         return BernoulliNB(**p)
 
     if name in ("k-Nearest Neighbours", "k-NN (distance weighted)"):
-        # p is only meaningful for minkowski; sklearn ignores it otherwise but
-        # warns, and kd_tree/ball_tree reject some metric choices.
         if p.get("metric") != "minkowski":
             p.pop("p", None)
         return KNeighborsClassifier(n_jobs=n_jobs, **p)
@@ -584,19 +471,6 @@ def build_tuned(name: str, params: dict, n_jobs: int = 1,
     if name == "Nearest Centroid":
         return NearestCentroid(**p)
 
-    # max_iter is a guard, not a tuned parameter. scikit-learn's SVC defaults
-    # to max_iter=-1, i.e. unbounded libsvm iterations, and a polynomial kernel
-    # at high C and degree on 2,116 x 153 non-separable rows can effectively
-    # never converge - one such draw ran for SEVENTEEN HOURS on a single core
-    # before this cap existed. The submitted pipeline capped its NuSVC at
-    # max_iter <= 2000 for the same reason; dropping that guard was an error.
-    #
-    # 200,000 is chosen to be far above what a converging fit needs (typical
-    # draws here finish in a few seconds) while bounding the pathological ones
-    # to about a minute. A capped fit emits a ConvergenceWarning and returns
-    # its current solution, which for a trial that was never going to be
-    # selected is the correct outcome. cache_size is raised from the 200 MB
-    # default because the kernel cache is what libsvm spends its time missing.
     if name == "SVM (RBF)":
         return SVC(kernel="rbf", probability=True, max_iter=200_000,
                    cache_size=1000, random_state=SEED, **p)
@@ -606,8 +480,6 @@ def build_tuned(name: str, params: dict, n_jobs: int = 1,
                    cache_size=1000, random_state=SEED, **p)
 
     if name == "Linear SVM":
-        # hinge is incompatible with the primal formulation, and dual='auto'
-        # resolves it; kept explicit so the combination cannot raise.
         return LinearSVC(dual="auto", random_state=SEED, **p)
 
     if name == "Decision Tree":
@@ -618,7 +490,7 @@ def build_tuned(name: str, params: dict, n_jobs: int = 1,
 
     if name in ("Random Forest", "Random Forest (balanced)"):
         if not p.get("bootstrap", True):
-            p["max_samples"] = None     # only valid when bootstrapping
+            p["max_samples"] = None
         return RandomForestClassifier(n_jobs=n_jobs, random_state=SEED,
                                       oob_score=False, **p)
 
@@ -635,10 +507,6 @@ def build_tuned(name: str, params: dict, n_jobs: int = 1,
             n_jobs=n_jobs, random_state=SEED, **p)
 
     if name == "AdaBoost":
-        # No `algorithm` argument: SAMME.R was deprecated and the parameter
-        # removed in scikit-learn 1.6, so the submitted pipeline's
-        # algorithm="SAMME" is now a TypeError rather than a no-op. SAMME is
-        # the only remaining behaviour, so dropping it changes nothing.
         return AdaBoostClassifier(random_state=SEED, **p)
 
     if name == "Gradient Boosting":
@@ -656,7 +524,6 @@ def build_tuned(name: str, params: dict, n_jobs: int = 1,
                              eval_metric="mlogloss", **p)
 
     if name == "LightGBM":
-        # dart ignores subsample_freq, and rf requires bagging to be enabled.
         if p.get("boosting_type") == "rf":
             p["subsample_freq"] = max(1, p.get("subsample_freq", 1))
             p["subsample"] = min(p.get("subsample", 0.9), 0.99)
@@ -681,20 +548,6 @@ def build_tuned(name: str, params: dict, n_jobs: int = 1,
 
 
 def build_meta(name: str, tuned: dict, n_jobs: int = 1):
-    """
-    Build a meta-ensemble from the tuned parameters of its base learners.
-
-    `tuned` maps base-model registry names to their best parameters for THIS
-    fold. Composing from already-tuned bases rather than searching the
-    ensemble's own space keeps the comparison honest: the ensemble is the same
-    three learners the individual rows report, combined, so any gain it shows
-    is attributable to combination rather than to a larger search budget. It
-    also means the ensemble inherits the fold's nested-CV discipline, since the
-    base parameters were selected inside this fold's training partition.
-
-    A base whose tuning failed falls back to the registry's untuned defaults, so
-    a single failure degrades the ensemble rather than removing it.
-    """
     from mlate import models as zoo
 
     def base(model_name: str, key: str):
@@ -722,7 +575,6 @@ def build_meta(name: str, tuned: dict, n_jobs: int = 1):
 
 
 def coverage() -> dict:
-    """Which registry entries are searched, composed, or carried untuned."""
     from mlate import models as zoo
     names = zoo.names()
     return {

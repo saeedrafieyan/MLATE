@@ -1,21 +1,3 @@
-"""
-Deep-learning and foundation-model benchmark figures
-====================================================
-
-    python 05_deep_learning/figures.py
-
-One figure per target, covering the six tabular architectures and the three
-foundation models together. They belong on one axis because they are scored on
-identical test rows - the same partition step 04 uses - which is what the
-shared-fold design in tuning_dl.py and foundation_models.py exists to make
-true.
-
-The conventional-ML benchmark uses the same builder, so the two figures share
-their metric order, their protocol colours and their family key. The only
-differences are the row count and that with nine rows there is room to print
-the heatmap values, which with thirty-three there is not.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -54,8 +36,6 @@ TASK_DETAIL = {
 }
 PRIMARY = ("weighted", "zero_shot")
 
-# Foundation models are not in the deep registry; they are in-context learners
-# rather than architectures trained here, and the family key says so.
 FOUNDATION_FAMILY = "foundation"
 
 

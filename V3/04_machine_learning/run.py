@@ -1,46 +1,3 @@
-"""
-Supervised benchmark
-====================
-
-    python 04_machine_learning/run.py                  # everything
-    python 04_machine_learning/run.py --tasks printability --protocols doi
-    python 04_machine_learning/run.py --force          # ignore checkpoints
-
-Fits every model in the registry against every task under every validation
-protocol and writes out-of-fold predictions, one row per test sample per model.
-Metrics are computed downstream in report.py from those predictions, so the
-scoring can be changed or extended without refitting anything.
-
-Protocols
----------
-random   StratifiedKFold over samples. Answers "can the model interpolate
-         within this corpus?". 97% of test rows share a publication with the
-         training set under this scheme, so it is reported as an upper bound
-         and never as a generalisation estimate.
-doi      StratifiedGroupKFold on DOI. Answers "will this transfer to a study
-         the model has not seen?", which is the question the tool actually
-         faces and the one reviewers R1-2 and R2-5 raise.
-tissue   Leave-one-tissue-out, with every study represented in the held-out
-         tissue also removed from training. The hardest protocol: unseen
-         tissue and unseen laboratory at once.
-
-Scheduling
-----------
-The preprocessor is fitted once per fold and reused by all 30 models; refitting
-it per model would repeat the most expensive shared step 30 times. Models are
-then run in two passes. Models that parallelise internally are run one at a
-time with the full CPU budget, because a 500-tree forest saturates the machine
-on its own. Models that do not are run concurrently, since each would otherwise
-occupy one core and leave the rest idle. Mixing the two in a single pool
-oversubscribes the CPU and runs slower than either arrangement alone.
-
-Checkpointing
--------------
-Predictions are written per task and protocol as soon as that combination
-finishes, and an existing file is skipped unless --force is passed. A run that
-dies at hour three resumes rather than restarting.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -71,16 +28,6 @@ PROTOCOLS = ("random", "doi", "tissue")
 
 def _fit_one(name: str, Xtr, ytr, Xte, n_jobs: int, device: str | None,
              classes: np.ndarray):
-    """
-    Fit and predict a single model. Never raises: a failure is a result.
-
-    Labels are encoded to 0..n-1 before fitting and decoded afterwards. XGBoost
-    rejects any other labelling outright, and Cell Response runs 1-5, so without
-    this the strongest boosting model silently disappears from two of the three
-    tasks. Encoding centrally rather than per-model keeps every classifier on
-    identical inputs. `classes` is the task-level label set, not the fold's, so
-    the encoding is stable across folds even where a fold lacks a class.
-    """
     t0 = time.perf_counter()
     try:
         code = {c: i for i, c in enumerate(classes)}
@@ -88,10 +35,6 @@ def _fit_one(name: str, Xtr, ytr, Xte, n_jobs: int, device: str | None,
         model = zoo.build(name, n_jobs=n_jobs, device=device)
         model.fit(Xtr, ytr_enc)
         pred = classes[np.asarray(model.predict(Xte)).ravel().astype(int)]
-        # Full probability vector, aligned to model.classes_, so ROC-AUC, log
-        # loss and the Brier score can be computed downstream. Storing only the
-        # maximum would make all three impossible.
-        # NB: not `classes`, which is the parameter holding the task label set.
         proba, seen = None, None
         if hasattr(model, "predict_proba"):
             try:
@@ -109,7 +52,6 @@ def _fit_one(name: str, Xtr, ytr, Xte, n_jobs: int, device: str | None,
 
 
 def run_fold(df, columns, fold, y, model_names, budget, devices) -> list[dict]:
-    # Fitted on this fold's training rows only, then applied to both sides.
     pre, _, _ = fold_preprocessor(df, columns, fold.train_idx)
     features = df[columns.predictors]
     Xtr = np.asarray(pre.transform(features.iloc[fold.train_idx]), dtype=float)
@@ -122,13 +64,11 @@ def run_fold(df, columns, fold, y, model_names, budget, devices) -> list[dict]:
     light = [n for n in model_names if not zoo.REGISTRY[n].threaded]
 
     results = []
-    # Serial pass: each model gets the whole CPU, and a GPU if it wants one.
     for i, name in enumerate(threaded):
         device = (devices[i % len(devices)]
                   if (zoo.REGISTRY[name].gpu and devices) else None)
         results.append(_fit_one(name, Xtr, ytr, Xte, budget.n_jobs, device,
                                 all_labels))
-    # Concurrent pass: many single-threaded models at once.
     if light:
         results += Parallel(n_jobs=min(len(light), budget.n_jobs),
                             backend="loky", verbose=0)(
@@ -152,9 +92,6 @@ def run_fold(df, columns, fold, y, model_names, budget, devices) -> list[dict]:
             "unseen_material": unseen,
             "seconds": r["seconds"], "error": "",
         })
-        # One column per class label, NaN for models without predict_proba.
-        # Columns are keyed by the label itself, not the model's column order,
-        # so a fold missing a class cannot silently shift the alignment.
         for c in all_labels:
             block[f"p_{c}"] = np.nan
         if r["proba"] is not None and r["classes"] is not None:

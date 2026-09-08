@@ -1,49 +1,3 @@
-"""
-Imputation benchmark
-====================
-
-    python -m preprocessing.validate_imputation
-
-Design
-------
-Studies are split with GroupKFold on DOI. For each fold the imputer is fitted
-on the training studies and applied to the held-out studies, 10% of whose
-observed printing-parameter values have been masked. All seven columns are
-masked together, because scoring one at a time would leave the other six
-complete and hand the imputer information it never has in production.
-
-The grouping is not a formality. Under ungrouped masking, KNN imputation looked
-like the clear winner - but 69% of rows carry a biomaterial-plus-cell-line
-signature unique to one study, so a masked row's nearest neighbours are its own
-paper's other rows and the imputer is recalling a sibling rather than inferring
-anything. Production imputers are fitted inside DOI-grouped folds and never get
-that shortcut, so the benchmark must not either.
-
-Strategies
-----------
-    median                    per-column median. Baseline.
-    constant 22 C / 25 C      ambient assumption, temperature columns only.
-    KNN (k=5)                 distance-weighted neighbours.
-    iterative + BayesianRidge linear multivariate.
-    iterative + RandomForest  bagged trees.
-    iterative + ExtraTrees    randomised trees.
-    iterative + XGBoost       gradient boosting - what the manuscript claims.
-
-Metrics
--------
-    MAE, RMSE            in each column's own units
-    nMAE                 MAE divided by the column's interquartile range, so
-                         columns on wildly different scales are comparable
-    R^2                  coefficient of determination on the masked values
-
-Caveat that belongs in the paper
---------------------------------
-Only reported values can be masked, and reported values are overwhelmingly the
-deliberately heated or cooled runs. The benchmark is therefore biased against a
-constant ambient fill, which exists to serve the unreported rows. Treat the
-constant's score as a lower bound, not a refutation.
-"""
-
 from __future__ import annotations
 
 import sys
@@ -71,7 +25,7 @@ warnings.filterwarnings("ignore", category=ConvergenceWarning)
 OUT = cfg.step_dir("02_preprocessing", "tables")
 MASK_FRACTION = 0.10
 REPEATS = 5
-MAX_ITER = cfg.IMPUTER_MAX_ITER   # sklearn stops early once tol is met
+MAX_ITER = cfg.IMPUTER_MAX_ITER
 
 
 def _iterative(estimator):
@@ -111,19 +65,6 @@ def _score(truth, pred, iqr) -> dict:
 
 
 def run() -> pd.DataFrame:
-    """
-    Study-grouped masking benchmark.
-
-    The imputer is fitted on the training studies of a DOI-grouped fold and
-    applied to the held-out studies, whose observed values are partly masked.
-    This matters more than it might appear. Under ungrouped masking a
-    neighbour-based imputer scores extremely well, but only because a masked
-    row's nearest neighbours are its own paper's other rows - 69% of rows carry
-    a biomaterial-plus-cell-line signature unique to one study, so the imputer
-    is recalling a sibling rather than inferring a value. Fitting on separate
-    studies removes that shortcut and measures what the pipeline actually does,
-    since production imputers are fitted inside DOI-grouped folds.
-    """
     df, columns = load_dataset()
     targets = [c for c in cfg.PRINT_PARAMS if df[c].isna().any()]
     numeric = columns.biomaterials + [columns.cell_density] + cfg.PRINT_PARAMS
@@ -161,10 +102,6 @@ def run() -> pd.DataFrame:
                     "pred": filled[col].to_numpy(float)[pos],
                 })
 
-        # Constants are only meaningful where 'not reported' plausibly means
-        # ambient, so they are scored on the temperature columns alone and
-        # ranked separately - averaging them against methods scored on all
-        # seven columns would not be a like-for-like comparison.
         for col in cfg.AMBIENT_COLUMNS:
             if col not in masked:
                 continue
@@ -191,11 +128,6 @@ def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     per_repeat = run()
 
-    # Pooled R2 per strategy: all masked values from every column and fold in
-    # one regression score. The mean of per-column R2 is not usable as a
-    # headline - a single column scoring -356 moves the average arbitrarily -
-    # so pooling is what gets reported, with the per-column values kept for
-    # detail.
     def _pool(frame) -> pd.DataFrame:
         out = []
         for strat, g in frame.groupby("strategy"):
@@ -214,9 +146,6 @@ def main() -> None:
     summary = (per_repeat
                .groupby(["column", "strategy"])[["MAE", "RMSE", "nMAE", "R2"]]
                .mean().reset_index())
-    # Rank general-purpose imputers over every column; rank the constants
-    # separately over the temperature columns only, alongside the general
-    # methods restricted to those same two columns.
     constants = summary["strategy"].str.startswith("constant")
     overall = (summary[~constants].groupby("strategy")[["nMAE", "R2"]]
                .mean().sort_values("nMAE").reset_index())

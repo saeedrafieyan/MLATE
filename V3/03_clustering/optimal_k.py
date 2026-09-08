@@ -1,50 +1,3 @@
-"""
-Does this corpus have a natural number of clusters?  (It does not.)
-==================================================================
-
-    python 03_clustering/optimal_k.py --dry-run
-    python 03_clustering/optimal_k.py
-
-This script establishes the negative result the selection rests on: no
-compactness criterion turns over on this corpus, so no compactness criterion
-can choose k. select_k.py then does the choosing, with criteria that can fail.
-
-What is computed, and what it showed
-------------------------------------
-1. GAP STATISTIC (Tibshirani, Walther & Hastie 2001) with the one-standard-error
-   rule. The standard principled selector, and explicitly constructed to have an
-   interior optimum when one exists. It has none here: the gap rises at all 33
-   steps from k = 2 to 60, in both the raw and the PCA space. Where the 1-SE rule
-   fires on such a curve it is firing on noise - one increment falling below one
-   standard error - so `gap_choice` reports the monotonicity check alongside the
-   trigger and refuses the number.
-2. GAUSSIAN-MIXTURE BIC. Penalises parameters directly and often has a clean
-   minimum where compactness indices have none. Here its argmin sits at the edge
-   of the swept range in the raw space, and in the PCA space is shallower than
-   the curve's own step-to-step variation, so `bic_choice` rejects it too.
-3. RAW vs PCA, settled by diagnostic rather than preference. 130 of the 153
-   columns are biomaterial concentrations that are zero in ~95% of rows, so raw
-   Euclidean distance may be dominated by shared ABSENCES. The Spearman
-   correlation between pairwise distance and the number of jointly-zero columns
-   measures exactly that - and it is -0.775 raw against -0.770 after PCA, so the
-   projection does not decouple distance from sparsity and buys nothing it was
-   meant to buy. The raw space, which the submitted manuscript also used, is
-   primary.
-4. HOPKINS, as a cluster-tendency check: 0.987 raw, 0.979 PCA, far from the 0.5
-   expected of structureless data. Structure exists; a preferred NUMBER of
-   groups does not.
-
-Why the fallback in this file is not the reported partition
------------------------------------------------------------
-The fallback below - highest silhouette above a stability floor, within an
-interpretability ceiling - is retained only to show what such a rule returns,
-because rules of that shape are what the literature commonly uses. It is
-degenerate on this corpus: silhouette rises monotonically, so the rule returns
-the edge of whatever window it is given, and different windows returned 12, 15
-and 2 from identical data. The reported partition comes from select_k.py
-instead.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -74,18 +27,15 @@ TABLES = cfg.step_dir("03_clustering", "tables")
 MATRIX = cfg.step_dir("02_preprocessing", "tables") / "feature_matrix.parquet"
 
 K_RANGE = range(2, 31)
-TAIL_K = (35, 40, 45, 50, 60)      # KMeans only, to document the tail
-GAP_B = 20                          # reference datasets per k
+TAIL_K = (35, 40, 45, 50, 60)
+GAP_B = 20
 N_BOOT = 20
-SILHOUETTE_SAMPLE = 2646            # whole corpus; no subsampling
+SILHOUETTE_SAMPLE = 2646
 INTERPRETABLE_CEILING = 12
 STABILITY_FLOOR = 0.60
 
 
-# ── spaces ───────────────────────────────────────────────────────────────────
-
 def build_spaces(matrix: pd.DataFrame) -> dict:
-    """The two candidate distance spaces, plus the diagnostics that judge them."""
     raw = matrix.to_numpy(dtype=float)
     pca = PCA(n_components=cl.PCA_VARIANCE, svd_solver="full",
               random_state=cfg.RANDOM_STATE)
@@ -98,15 +48,6 @@ def build_spaces(matrix: pd.DataFrame) -> dict:
 
 def sparsity_coupling(raw: np.ndarray, X: np.ndarray, n_pairs: int = 40_000,
                       seed: int = cfg.RANDOM_STATE) -> float:
-    """
-    Spearman correlation between pairwise distance and shared-zero count.
-
-    The question this answers: when two formulations are far apart in this
-    space, is that because their chemistries differ, or merely because they
-    omit different subsets of 130 mostly-absent materials? A strong negative
-    correlation - more shared zeros, smaller distance - means the space is
-    largely measuring co-absence.
-    """
     from scipy.stats import spearmanr
     rng = np.random.default_rng(seed)
     n = len(raw)
@@ -122,13 +63,6 @@ def sparsity_coupling(raw: np.ndarray, X: np.ndarray, n_pairs: int = 40_000,
 
 def hopkins(X: np.ndarray, m_frac: float = 0.05,
             seed: int = cfg.RANDOM_STATE) -> float:
-    """
-    Hopkins statistic: does this data cluster at all?
-
-    ~0.5 means indistinguishable from uniform (no cluster tendency); values
-    approaching 1 indicate structure. Reported because a k-selection exercise
-    on structureless data is meaningless regardless of which criterion wins.
-    """
     from sklearn.neighbors import NearestNeighbors
     rng = np.random.default_rng(seed)
     n, d = X.shape
@@ -137,29 +71,13 @@ def hopkins(X: np.ndarray, m_frac: float = 0.05,
 
     sample_idx = rng.choice(n, m, replace=False)
     nn = NearestNeighbors(n_neighbors=2).fit(X)
-    # distance to the nearest OTHER real point
     w = nn.kneighbors(X[sample_idx], n_neighbors=2)[0][:, 1]
-    # distance from a uniform point to the nearest real point
     uniform = rng.uniform(lo, hi, size=(m, d))
     u = nn.kneighbors(uniform, n_neighbors=1)[0][:, 0]
     return float(u.sum() / (u.sum() + w.sum()))
 
 
-# ── algorithms ───────────────────────────────────────────────────────────────
-
 def algorithms(space: str, seed: int = cfg.RANDOM_STATE) -> dict:
-    """
-    The four algorithms of the submitted manuscript plus the two added in
-    re-analysis. MiniBatchKMeans is restored: it appears in the published
-    Table S3, and dropping it would leave a published row with no counterpart.
-
-    GaussianMixture uses full covariance in PCA space and DIAGONAL covariance
-    in raw space. In 153 dimensions where 130 columns are zero in ~95% of rows,
-    a full per-component covariance matrix is rank-deficient; it would either
-    fail outright or be rescued by regularisation into a number that means
-    nothing. The restriction is a real limitation of the raw space and is
-    recorded as such rather than hidden.
-    """
     cov = "full" if space == "pca" else "diag"
     return {
         "KMeans": lambda k: KMeans(n_clusters=k, n_init=20, random_state=seed),
@@ -176,7 +94,6 @@ def algorithms(space: str, seed: int = cfg.RANDOM_STATE) -> dict:
 
 
 def within_dispersion(X: np.ndarray, labels: np.ndarray) -> float:
-    """Tibshirani's W_k: pooled within-cluster sum of squares."""
     total = 0.0
     for c in np.unique(labels):
         pts = X[labels == c]
@@ -185,10 +102,7 @@ def within_dispersion(X: np.ndarray, labels: np.ndarray) -> float:
     return float(total)
 
 
-# ── criteria ─────────────────────────────────────────────────────────────────
-
 def score_one(space: str, name: str, k: int, X: np.ndarray) -> dict:
-    """Every k-dependent criterion for one (space, algorithm, k)."""
     make = algorithms(space)[name]
     with resources.single_thread():
         model = make(k)
@@ -213,10 +127,6 @@ def score_one(space: str, name: str, k: int, X: np.ndarray) -> dict:
 
 
 def gap_one(space: str, k: int, X: np.ndarray, seed: int) -> dict:
-    """
-    One point of the gap curve: log W_k on the data against B uniform
-    reference sets drawn over the bounding box of the same space.
-    """
     make = algorithms(space)["KMeans"]
     rng = np.random.default_rng(seed + k)
     with resources.single_thread():
@@ -236,18 +146,6 @@ def gap_one(space: str, k: int, X: np.ndarray, seed: int) -> dict:
 
 
 def gap_choice(gap: pd.DataFrame) -> tuple[int | None, str]:
-    """
-    Tibshirani's 1-SE rule: smallest k with Gap(k) >= Gap(k+1) - s(k+1).
-
-    Returns the triggering k AND a monotonicity verdict, because the rule alone
-    is not safe to read as an optimum. It compares one increment against one
-    standard error, so on a curve that never turns over it still fires wherever
-    a single increment happens to fall below the noise band - which is a
-    fluctuation, not a knee. On this corpus the PCA curve rises at every one of
-    33 steps yet the rule fired at k=23 on an increment of 0.0014 against a mean
-    of 0.033. Reporting that as "the optimal number of clusters is 23" would
-    have been wrong, so the check travels with the number.
-    """
     g = gap.sort_values("k").reset_index(drop=True)
     inc = g["gap"].diff().dropna()
     monotone = bool((inc > 0).all())
@@ -265,13 +163,6 @@ def gap_choice(gap: pd.DataFrame) -> tuple[int | None, str]:
 
 
 def bic_choice(b: pd.DataFrame) -> tuple[int | None, str]:
-    """
-    Interior BIC minimum, rejected when it is indistinguishable from noise.
-
-    A minimum only means something if it is deeper than the curve's own
-    step-to-step wobble. Here neighbouring k differ by more than the margin the
-    "minimum" holds over them, so the argmin is not a model-selection signal.
-    """
     b = b.sort_values("k").reset_index(drop=True)
     i = int(b["bic"].values.argmin())
     if i == 0 or i == len(b) - 1:
@@ -286,14 +177,6 @@ def bic_choice(b: pd.DataFrame) -> tuple[int | None, str]:
 
 
 def knee(k_values, curve) -> int | None:
-    """
-    Elbow by maximum distance to the chord joining the curve's endpoints.
-
-    The classical construction, implemented directly rather than pulled from a
-    dependency: it always returns a point, so a value here is not evidence that
-    an elbow exists - the curvature reported beside it is what says whether the
-    bend is real.
-    """
     k = np.asarray(k_values, dtype=float)
     y = np.asarray(curve, dtype=float)
     if len(k) < 3:
@@ -351,7 +234,6 @@ def main() -> None:
         for sp, k in gaps)
     gapdf = pd.DataFrame(gap_rows)
 
-    # HDBSCAN sweeps its own parameter and is reported, not ranked.
     hdb = []
     for sp in spaces:
         for size in (15, 25, 40, 60, 100):
@@ -372,7 +254,6 @@ def main() -> None:
         pd.DataFrame(hdb).round(5).to_excel(xl, sheet_name="hdbscan",
                                             index=False)
 
-    # ── apply the pre-registered rule ────────────────────────────────────
     print("\n" + "=" * 74)
     print("PRE-REGISTERED DECISION RULE")
     print("=" * 74)

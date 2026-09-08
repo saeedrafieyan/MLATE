@@ -1,24 +1,3 @@
-"""
-MLATE V3 — build the publication-ready dataset
-==============================================
-
-Reads the immutable raw workbook and emits a cleaned, reordered, publishable
-dataset plus a data dictionary and a data-quality audit workbook.
-
-The raw file is NEVER modified.
-
-Outputs (under codes/data/):
-  MLATE_V3_dataset.xlsx      publication dataset  (also .csv)
-  MLATE_V3_internal.xlsx     same + internal provenance columns
-  MLATE_V3_dictionary.xlsx   column dictionary for the supplement
-  MLATE_V3_audit.xlsx        rows needing expert resolution
-
-Column order (as agreed):
-  Reference | DOI | target_tissue | target_tissue_all | is_cancer_model
-  | <biomaterials> | Cell Line | Cell Density | <printing parameters>
-  | Printability | Cell Response | dup_group_id | label_conflict
-"""
-
 from __future__ import annotations
 
 import sys
@@ -32,9 +11,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-# ─────────────────────────────────────────────────────────────────────────────
-# CONFIGURATION
-# ─────────────────────────────────────────────────────────────────────────────
 RAW_PATH = Path(
     "G:/My Drive/Papers/MLATE V3_Revision/MLATE_V3_code_and_dataset_2026-08-31"
     "/MLATE_V3_code_and_dataset/data/raw/MLATE_V3_dataset.xlsx"
@@ -47,8 +23,6 @@ TARGETS = ["Printability", "Cell Response"]
 
 CELL_COLS = ["Cell Line", "Cell Density (million cells/mL)"]
 
-# Printing parameters, in the order they should appear.
-# 'Extrusion Rate Lengthwise (mm/s)' is deliberately excluded (99.4% missing).
 PRINT_PARAMS = [
     "Physical Crosslinking Duration (s)",
     "Photo Crosslinking Duration (s)",
@@ -59,12 +33,10 @@ PRINT_PARAMS = [
     "Substrate Temperature (\u00b0C)",
 ]
 
-# Study/sample descriptors kept in the published file.
 KEEP_META_FRONT = ["Reference", "DOI", "target_tissue", "target_tissue_all",
                    "is_cancer_model"]
 KEEP_META_BACK = ["dup_group_id", "label_conflict"]
 
-# Dropped from the published file, with the reason recorded in the dictionary.
 DROP_COLUMNS = {
     "Extrusion Rate Lengthwise (mm/s)":
         "99.4% missing (16/2646 rows) - not usable as a predictor",
@@ -88,20 +60,8 @@ DROP_COLUMNS = {
         "True for only 2 of 2646 rows",
 }
 
-# NOTE ON IMPUTATION
-# This script performs NO feature imputation. Missing predictors are left as
-# NaN so that the published dataset records what the source studies actually
-# reported. All imputation - including the room-temperature assumption for
-# Syringe/Substrate Temperature - belongs to the preprocessing stage, where it
-# must be fitted inside each cross-validation fold to stay leakage-safe.
-#
-# The nine rows with no reported Cell Response are a labelling decision, not
-# imputation: Cell Response is a target, so it cannot be filled downstream.
-# Those rows are all cellular constructs and take class 4 by expert decision.
 CELL_RESPONSE_FILL = 4
 
-# Non-anatomical target_tissue values collapsed to 'not_organ_specific'
-# when deriving the modelling tissue for leave-one-tissue-out experiments.
 NON_ORGAN_TISSUES = {
     "undifferentiated_stem_cell",
     "acellular",
@@ -111,9 +71,6 @@ NON_ORGAN_TISSUES = {
 
 ACELLULAR_TOKEN = "NoCellCultured"
 
-# ── column-name repairs for the public release ───────────────────────────────
-# Genuine misspellings, verified against the biomaterial taxonomy audit.
-# Only the spelling changes; units and values are untouched.
 SPELLING_FIXES = {
     "hyaluronan metacrylate (%w/v)":     "hyaluronan methacrylate (%w/v)",
     "Nano/Methycellulose (%w/v)":        "Nano/Methylcellulose (%w/v)",
@@ -127,22 +84,13 @@ SPELLING_FIXES = {
     "Pluronic F127 (%w/v)/Lutrol F127 (%w/v)": "Pluronic F127 / Lutrol F127 (%w/v)",
 }
 
-# Cell-line vocabulary. Outright misspellings are fixed here; the remaining
-# variants come from cellline_synonyms.csv, where rows marked 'merge' differ
-# only in spelling, case, whitespace, punctuation or plural. Rows marked
-# 'keep_separate' resemble another name but are biologically distinct
-# (MSCs vs bMSCs, HACs vs hASCs) and are never merged. Edit the CSV, not this.
 CELL_LINE_FIXES = {
     "chondrocyteyte": "chondrocytes",
 }
 SYNONYM_PATH = Path(__file__).parent / "reference" / "cellline_synonyms.csv"
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# CLEANING HELPERS
-# ─────────────────────────────────────────────────────────────────────────────
 def clean_text(s: pd.Series) -> pd.Series:
-    """Strip non-breaking spaces, collapse runs of whitespace, trim."""
     return (
         s.astype("string")
         .str.replace("\u00a0", " ", regex=False)
@@ -152,12 +100,6 @@ def clean_text(s: pd.Series) -> pd.Series:
 
 
 def normalise_doi(s: pd.Series) -> pd.Series:
-    """
-    Canonical DOI form: lowercase, no resolver prefix, no surrounding space.
-
-    DOIs are the grouping key for every leakage-safe split, so two spellings
-    of the same DOI would silently split one study across train and test.
-    """
     out = clean_text(s).str.lower()
     out = out.str.replace(r"^(https?://)?(dx\.)?doi\.org/", "", regex=True)
     out = out.str.replace(r"^doi:\s*", "", regex=True)
@@ -165,14 +107,6 @@ def normalise_doi(s: pd.Series) -> pd.Series:
 
 
 def normalise_column_name(name: str) -> str:
-    """
-    Put every column into a consistent 'Name (unit)' form.
-
-    Collapses repeated spaces and guarantees exactly one space before the
-    trailing unit group. Parenthesised acronyms inside the name - '(SPS)',
-    '(H2O2)', 'poly(N-isopropylacrylamide)' - are preserved, because only the
-    final group is treated as the unit.
-    """
     n = re.sub(r"\s+", " ", str(name)).strip()
     if (m := re.match(r"^(.*?)\s*\(([^()]*)\)$", n)):
         return f"{m.group(1).strip()} ({m.group(2).strip()})"
@@ -180,7 +114,6 @@ def normalise_column_name(name: str) -> str:
 
 
 def repair_column_names(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Apply spelling fixes, then normalise spacing. Returns a change log."""
     renames = {}
     for col in df.columns:
         fixed = normalise_column_name(SPELLING_FIXES.get(col, col))
@@ -198,15 +131,6 @@ def repair_column_names(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 def coerce_numeric(df: pd.DataFrame,
                    columns: list[str]) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Force every predictor column to a numeric dtype.
-
-    Some values arrive as text carrying a trailing non-breaking space
-    ('800\\xa0'), which float() rejects, so the column stays object-typed and
-    the value would silently vanish at the first numeric operation.
-
-    Returns the frame and a record of each repaired or unparseable value.
-    """
     out = df.copy()
     repaired = []
     for col in columns:
@@ -233,15 +157,6 @@ def coerce_numeric(df: pd.DataFrame,
 
 
 def parse_cell_density(s: pd.Series) -> tuple[pd.Series, pd.DataFrame]:
-    """
-    Coerce Cell Density to a single numeric total.
-
-    Co-culture rows report one density per cell type as a delimited string
-    (e.g. 'HMEC-1/ fibroblast/ THP-1' -> '5,25,5'). The column is defined as
-    the cell concentration of the bioink, so the components are summed.
-
-    Returns the numeric series and a record of every row that was rewritten.
-    """
     raw = s.copy()
     numeric = pd.to_numeric(raw, errors="coerce")
     multi = numeric.isna() & raw.notna()
@@ -264,22 +179,12 @@ def parse_cell_density(s: pd.Series) -> tuple[pd.Series, pd.DataFrame]:
 
 
 def derive_modeling_tissue(target_tissue: pd.Series) -> pd.Series:
-    """Collapse non-anatomical categories; used for leave-one-tissue-out."""
     return target_tissue.where(~target_tissue.isin(NON_ORGAN_TISSUES),
                                "not_organ_specific")
 
 
 def recompute_duplicate_groups(df: pd.DataFrame,
                                feature_cols: list[str]) -> pd.DataFrame:
-    """
-    Recompute duplicate groups on the CLEANED predictor vector.
-
-    Cleaning cell-line whitespace merges rows that the raw audit treated as
-    distinct, so the raw dup_group_id is stale and must be rebuilt.
-
-    A group is a set of rows with an identical predictor vector. It is a
-    'label conflict' when those rows disagree on either target.
-    """
     key = df[feature_cols].astype(str).agg("\u241f".join, axis=1)
     group_id = key.factorize()[0]
     out = df.copy()
@@ -293,9 +198,6 @@ def recompute_duplicate_groups(df: pd.DataFrame,
     return out
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# BUILD
-# ─────────────────────────────────────────────────────────────────────────────
 def build() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     raw = pd.read_excel(RAW_PATH, sheet_name=RAW_SHEET)
@@ -303,7 +205,6 @@ def build() -> None:
 
     df = raw.copy()
 
-    # ── text hygiene ────────────────────────────────────────────────────────
     n_cell_before = df["Cell Line"].nunique()
     df["Cell Line"] = clean_text(df["Cell Line"])
     df["Reference"] = clean_text(df["Reference"])
@@ -312,14 +213,12 @@ def build() -> None:
     print(f"  Cell Line : {n_cell_before} -> {df['Cell Line'].nunique()} unique")
     print(f"  DOI       : {n_doi_before} -> {df['DOI'].nunique()} unique")
 
-    # ── column-name repairs ─────────────────────────────────────────────────
     df, rename_log = repair_column_names(df)
     if len(rename_log):
         n_sp = int((rename_log["kind"] == "spelling").sum())
         print(f"  column names: {n_sp} misspellings, "
               f"{len(rename_log) - n_sp} spacing fixes")
 
-    # ── cell-line vocabulary ────────────────────────────────────────────────
     n_before = df["Cell Line"].nunique()
     df["Cell Line"] = df["Cell Line"].replace(CELL_LINE_FIXES)
 
@@ -333,25 +232,21 @@ def build() -> None:
           f"{df['Cell Line'].nunique()} unique "
           f"({n_sep} look-alikes deliberately kept separate)")
 
-    # ── cell density: co-culture strings -> summed total ────────────────────
     density_col = "Cell Density (million cells/mL)"
     df[density_col], density_fixes = parse_cell_density(df[density_col])
     if len(density_fixes):
         print(f"  cell density: {len(density_fixes)} co-culture rows summed "
               f"({', '.join(density_fixes['raw_value'].astype(str))})")
 
-    # ── target labelling decision (targets cannot be imputed downstream) ────
     response_filled = df.index[df["Cell Response"].isna()].tolist()
     df["Cell Response"] = (df["Cell Response"]
                            .fillna(CELL_RESPONSE_FILL).astype(int))
     print(f"  Cell Response: filled {len(response_filled)} rows "
           f"with class {CELL_RESPONSE_FILL}")
 
-    # ── the expert flag becomes the only cancer flag ────────────────────────
     df = df.drop(columns=["is_cancer_model"])
     df = df.rename(columns={"expert_cancer_model": "is_cancer_model"})
 
-    # ── work out the biomaterial block ──────────────────────────────────────
     dropped = [c for c in DROP_COLUMNS if c in df.columns]
     non_biomaterial = set(
         KEEP_META_FRONT + KEEP_META_BACK + CELL_COLS + PRINT_PARAMS
@@ -360,7 +255,6 @@ def build() -> None:
     biomaterials = [c for c in df.columns if c not in non_biomaterial]
     print(f"  biomaterials: {len(biomaterials)}")
 
-    # ── every predictor must be genuinely numeric ───────────────────────────
     df, repaired = coerce_numeric(df, biomaterials + PRINT_PARAMS)
     if len(repaired):
         n_fix = int((repaired["status"] == "repaired").sum())
@@ -370,14 +264,12 @@ def build() -> None:
             print(f"     {col}: {len(grp)} "
                   f"({', '.join(sorted(set(grp['raw_value']))[:4])})")
 
-    # ── recompute duplicate groups on cleaned predictors ────────────────────
     predictors = biomaterials + CELL_COLS + PRINT_PARAMS
     df = recompute_duplicate_groups(df, predictors)
     n_conflict = int(df["label_conflict"].sum())
     print(f"  duplicate groups: {df['dup_group_id'].nunique()} "
           f"| rows in label-conflicting groups: {n_conflict}")
 
-    # ── assemble in the agreed order ────────────────────────────────────────
     ordered = (KEEP_META_FRONT + biomaterials + CELL_COLS + PRINT_PARAMS
                + TARGETS + KEEP_META_BACK)
     published = df[ordered].copy()
@@ -386,7 +278,6 @@ def build() -> None:
     internal["source_dataset"] = raw["source_dataset"].values
     internal["modeling_tissue"] = derive_modeling_tissue(published["target_tissue"])
 
-    # ── write ───────────────────────────────────────────────────────────────
     published.to_excel(OUT_DIR / "MLATE_V3_dataset.xlsx", index=False)
     published.to_csv(OUT_DIR / "MLATE_V3_dataset.csv", index=False,
                      encoding="utf-8-sig")
@@ -401,7 +292,6 @@ def build() -> None:
 
 def imputation_log(response_filled: list[int],
                    density_fixes: pd.DataFrame) -> pd.DataFrame:
-    """Every value this script wrote, so the paper can state it exactly."""
     rows = []
     rows.append({
         "column": "Cell Response",
@@ -421,7 +311,6 @@ def imputation_log(response_filled: list[int],
 
 def write_dictionary(df: pd.DataFrame, biomaterials: list[str],
                      dropped: list[str]) -> None:
-    """Column dictionary for the supplementary material."""
     def role(col: str) -> str:
         if col in KEEP_META_FRONT:
             return "study descriptor"
@@ -475,15 +364,6 @@ def write_audit(df: pd.DataFrame, biomaterials: list[str],
                 imputations: pd.DataFrame,
                 repaired: pd.DataFrame,
                 rename_log: pd.DataFrame) -> None:
-    """
-    Data-quality record accompanying the published dataset.
-
-    'replicate_disagreements' are retained by design: they are repeated
-    formulations that produced different experimental outcomes, so they carry
-    real biological variability rather than error. Because every such group
-    falls within one DOI, DOI-grouped splitting keeps them out of the
-    train/test boundary automatically.
-    """
     is_acellular = df["Cell Line"].eq(ACELLULAR_TOKEN)
 
     conflicts = (

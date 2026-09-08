@@ -1,22 +1,3 @@
-"""
-Complete per-protocol leaderboards
-==================================
-
-    python 04_machine_learning/figures_by_protocol.py
-
-One figure per validation protocol, each showing every model in the registry
-against every task. Figure 5 compares the protocols on the ten leading models;
-these show the full field, one protocol at a time, so a reader can look up any
-model without the two protocols interleaved.
-
-Models share a single ordering across the three task panels - sorted by their
-mean macro F1 within that protocol - so a row can be read straight across, and
-the reordering between protocols is visible by comparing the two figures. Bars
-are coloured by model family, which is what makes the capacity effect legible:
-under random splitting the ensembles sit at the top, and under study grouping
-they do not.
-"""
-
 from __future__ import annotations
 
 import sys
@@ -49,9 +30,6 @@ PROTOCOL = {
                "unseen tissue and unseen laboratory simultaneously"),
 }
 
-# Eleven families, eight palette colours. The three additions are tinted from
-# the existing hues rather than pulled from another palette, so the figure stays
-# inside the paper's colour system.
 FAMILY_COLOURS = {
     "baseline": ms.SLATE,
     "linear": ms.NAVY,
@@ -61,9 +39,9 @@ FAMILY_COLOURS = {
     "svm": ms.GOLD,
     "tree": ms.CLAY,
     "bagging": ms.RUST,
-    "boosting": "#1C5E72",     # deep cyan-navy
-    "neural": "#8E6FA8",       # light plum
-    "meta": "#5C7A54",         # deep sage
+    "boosting": "#1C5E72",
+    "neural": "#8E6FA8",
+    "meta": "#5C7A54",
 }
 
 
@@ -86,7 +64,6 @@ def draw(board: pd.DataFrame, protocol: str) -> None:
     stem, title, subtitle = PROTOCOL[protocol]
     tasks = [t for t in TASK_TITLE if t in set(cell["task"])]
 
-    # One ordering for all panels: mean macro F1 across tasks, best at top.
     order = (cell.groupby("model")["macro_f1"].mean()
              .sort_values(ascending=True).index.tolist())
     family = board.drop_duplicates("model").set_index("model")["family"]

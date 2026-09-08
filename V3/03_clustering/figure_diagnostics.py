@@ -1,23 +1,3 @@
-"""
-Clustering diagnostics figure (S8)
-==================================
-
-    python 03_clustering/figure_diagnostics.py
-
-For a literature-mined corpus, reporting a partition without reporting what it
-corresponds to is not enough: an unsupervised method has no defence against
-grouping rows by their source publication, and the reader needs the number
-rather than a reassurance. Four panels.
-
-  A  silhouette against k for the real matrix and for a column-permuted null.
-     The real curve sits clearly above the null, so there is genuine structure -
-     but it never turns over, so there is no natural number of clusters.
-  B  what the fine structure is made of: agreement with source publication
-     against agreement with tissue, as k increases.
-  C  agreement of the selected partition with four external labels.
-  D  robustness, each test against its own baseline.
-"""
-
 from __future__ import annotations
 
 import sys
@@ -35,13 +15,6 @@ TABLES = cfg.step_dir("03_clustering", "tables")
 
 
 def reporting_flag_ami(matrix, doi, k: int) -> tuple[float, float]:
-    """
-    AMI with source publication when clustering on the reporting flags alone,
-    and when clustering with them removed.
-
-    Computed here rather than pinned as constants so the annotation cannot
-    drift away from the data if k or the preprocessing changes.
-    """
     from sklearn.cluster import KMeans
     from sklearn.metrics import adjusted_mutual_info_score
 
@@ -74,7 +47,6 @@ def main() -> None:
     fig = ms.plt.figure(figsize=(ms.WIDTHS["double"], 5.6))
     gs = fig.add_gridspec(2, 2, hspace=0.52, wspace=0.40)
 
-    # ── A. real vs permuted null ────────────────────────────────────────────
     ax = fig.add_subplot(gs[0, 0])
     ax.plot(curve["k"], curve["silhouette"], marker="o", ms=2.8, lw=1.5,
             color=ms.NAVY, label="observed")
@@ -94,20 +66,12 @@ def main() -> None:
     ax.set_title("structure is real, but has no natural $k$",
                  size=6.6, color=ms.MUTED, pad=4)
 
-    # ── B. what the structure resolves into ─────────────────────────────────
     ax = fig.add_subplot(gs[0, 1])
     ax.plot(curve["k"], curve["AMI_DOI"], marker="o", ms=2.8, lw=1.5,
             color=ms.RUST, label="source publication (DOI)")
     ax.plot(curve["k"], curve["AMI_tissue"], marker="o", ms=2.8, lw=1.5,
             color=ms.TEAL, label="target tissue")
 
-    # Where the publication signal comes from. The seven binary columns
-    # recording whether each printing parameter was reported are metadata about
-    # a journal's requirements, not properties of a scaffold - and clustering on
-    # those seven alone recovers source publication BETTER than clustering on
-    # all 153 features (AMI 0.342 against 0.275 at the reported k = 3, falling
-    # to 0.179 when they are removed). Marking the three points makes the
-    # mechanism visible instead of leaving the DOI curve unexplained.
     flags_only, no_flags = reporting_flag_ami(matrix, doi, int(bundle["k"]))
     ax.scatter([bundle["k"]], [flags_only], s=30, marker="^", color=ms.RUST,
                zorder=5, label="DOI, the 7 reporting flags alone")
@@ -128,7 +92,6 @@ def main() -> None:
     ax.set_title("finer partitions resolve publications, not tissues",
                  size=6.6, color=ms.MUTED, pad=4)
 
-    # ── C. selected partition vs external labels ────────────────────────────
     ax = fig.add_subplot(gs[1, 0])
     metrics, colours = ["AMI", "ARI", "purity"], [ms.NAVY, ms.TEAL, ms.GOLD]
     y = np.arange(len(agree))
@@ -150,13 +113,11 @@ def main() -> None:
     ax.legend(loc="lower left", bbox_to_anchor=(0, 1.02), ncol=3, fontsize=5.8)
     ms.panel_tag(ax, "C", dx=-0.46, dy=1.15)
 
-    # ── D. robustness against its own baselines ─────────────────────────────
     ax = fig.add_subplot(gs[1, 1])
     y = np.arange(len(sens))
     colours = [ms.SLATE, ms.SLATE, ms.RUST]
     ax.barh(y, sens["ARI"], height=0.52, color=colours)
     for yi, row in zip(y, sens.itertuples()):
-        # Clear the whisker cap, not just the bar end.
         edge = row.ARI_max if np.isfinite(row.ARI_max) else row.ARI
         ax.text(edge + 0.022, yi, f"{row.ARI:.2f}", va="center", size=5.8,
                 color=ms.MUTED)

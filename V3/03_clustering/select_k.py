@@ -1,60 +1,3 @@
-"""
-The optimal number of clusters, from criteria that can actually have an optimum
-==============================================================================
-
-    python 03_clustering/select_k.py --dry-run
-    python 03_clustering/select_k.py
-
-Why this file exists
---------------------
-Earlier passes selected k with silhouette, or with rules built on top of it -
-"highest silhouette above a stability floor, within k in [a, b]". On this corpus
-silhouette rises monotonically from k = 2 to k = 60, and so does the gap
-statistic. Any rule of that shape therefore returns the edge of whatever window
-it was given: window [2,12] returns 12, window [4,15] returns 15, no window
-returns 2. Those are three different answers to the question "what does the
-window say", not three answers to "how many clusters are there". The fault is
-the criterion, not the data.
-
-Two criteria are constructed to have an interior optimum, and both are used here.
-
-PREDICTION STRENGTH  (Tibshirani & Walther 2005)
-    Split the rows in half. Cluster each half independently into k groups.
-    Assign the test half to the training half's centroids, then ask, for each
-    test cluster, what proportion of its within-cluster pairs are still
-    co-assigned under the training centroids. Prediction strength is the
-    WORST cluster's proportion - a partition is only as trustworthy as its
-    least reproducible group.
-
-    This cannot run away to large k. Splitting genuine structure into more
-    pieces than it contains produces at least one group that the other half
-    cannot reproduce, and the minimum collapses. The conventional decision rule
-    is the largest k whose mean prediction strength reaches 0.80.
-
-    The reported partition does not quite meet that bar and the departure is
-    deliberate: bisecting k-means at k = 4 scores 0.794. It is adopted over the
-    highest-scoring cell (k-means at k = 3, 0.936) because prediction strength
-    measures REPRODUCIBILITY, not interpretability, and the k = 3 solution
-    splits a coherent 477-record group - entirely cellular, defined by ionic
-    alginate-CaCl2 crosslinking - 263/214 across two of its clusters. Within its
-    own algorithm the reported configuration is a local maximum rather than a
-    near miss: 0.860, 0.680, 0.794, 0.580 for k = 2..5. The full grid is written
-    out so a reader can apply a different rule and see what it returns.
-
-PROPORTION OF AMBIGUOUS CLUSTERING  (Monti et al. 2003; Senbabaoglu 2014)
-    Resample the rows many times, cluster each resample, and record how often
-    each pair of points lands in the same cluster given both were drawn. A
-    consensus value near 0 or near 1 is a decided pair; anything between is
-    ambiguous. PAC is the fraction of pairs falling in (0.1, 0.9), so LOWER is
-    better, and it too degrades once k exceeds the structure present.
-
-Both are computed for every algorithm, so the algorithm and k are chosen
-together rather than k being chosen inside an algorithm picked for other
-reasons. Silhouette, Davies-Bouldin, Calinski-Harabasz and bootstrap stability
-are carried alongside for continuity with the submitted manuscript, but they do
-not decide anything here.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -79,8 +22,8 @@ TABLES = cfg.step_dir("03_clustering", "tables")
 MATRIX = cfg.step_dir("02_preprocessing", "tables") / "feature_matrix.parquet"
 
 K_RANGE = range(2, 21)
-PS_SPLITS = 20          # half-splits per (algorithm, k)
-CONSENSUS_RUNS = 30     # resamples per (algorithm, k)
+PS_SPLITS = 20
+CONSENSUS_RUNS = 30
 CONSENSUS_FRACTION = 0.80
 PAC_LOW, PAC_HIGH = 0.10, 0.90
 PS_THRESHOLD = 0.80
@@ -98,14 +41,6 @@ def _assign(X: np.ndarray, centres: np.ndarray) -> np.ndarray:
 
 def prediction_strength(X: np.ndarray, make, k: int, n_splits: int,
                         seed: int) -> float:
-    """
-    Mean over splits of the worst cluster's preserved co-membership fraction.
-
-    Comparing co-membership rather than labels is what makes this well defined:
-    cluster numbering is arbitrary between two independent fits, so any
-    label-matching scheme would need an assignment step and would inherit its
-    arbitrariness. Pairs do not have that problem.
-    """
     rng = np.random.default_rng(seed)
     n = len(X)
     out = []
@@ -119,7 +54,6 @@ def prediction_strength(X: np.ndarray, make, k: int, n_splits: int,
             continue
         if len(np.unique(lab_a)) < 2 or len(np.unique(lab_b)) < 2:
             continue
-        # test points, assigned to the TRAINING half's centroids
         cross = _assign(X[b], _centroids(X[a], lab_a))
         worst = 1.0
         for c in np.unique(lab_b):
@@ -128,7 +62,6 @@ def prediction_strength(X: np.ndarray, make, k: int, n_splits: int,
             if m < 2:
                 continue
             same = cross[idx][:, None] == cross[idx][None, :]
-            # off-diagonal pairs only
             preserved = (same.sum() - m) / (m * (m - 1))
             worst = min(worst, float(preserved))
         out.append(worst)
@@ -136,13 +69,6 @@ def prediction_strength(X: np.ndarray, make, k: int, n_splits: int,
 
 
 def pac(X: np.ndarray, make, k: int, n_runs: int, seed: int) -> float:
-    """
-    Proportion of pairs whose co-clustering frequency is ambiguous.
-
-    The consensus matrix is accumulated as counts rather than stored per run,
-    and only the scalar comes back, because a 2,646 x 2,646 float matrix per
-    (algorithm, k) cell would not survive being held across a parallel sweep.
-    """
     rng = np.random.default_rng(seed)
     n = len(X)
     m = int(CONSENSUS_FRACTION * n)

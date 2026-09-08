@@ -1,20 +1,3 @@
-"""
-Publication tables for the clustering section
-=============================================
-
-    python 03_clustering/manuscript_tables.py
-
-Emits Tables S9 and S10 in the form the manuscript text refers to, with the
-index abbreviations (SI, DBI, CHI) used in the captions rather than the internal
-column names, and with values rounded to the precision actually reported.
-
-  Table S9   algorithm and cluster-number sweep
-  Table S10  composition of the twelve clusters
-
-Derived entirely from the tables written by run.py, characterise.py and
-diagnose.py, so the manuscript and the analysis cannot drift apart.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -38,20 +21,11 @@ def table_s9(tag: str = "") -> tuple[pd.DataFrame, pd.DataFrame]:
               "calinski_harabasz": "CHI", "stability": "Stability (ARI)",
               "n_noise": "n_noise"}
 
-    # Truncated at k = 20, the range over which the selection criteria were
-    # computed. The compactness sweep ran to k = 30, but reporting those rows
-    # left prediction strength and PAC blank for a third of the table, which
-    # reads as missing data rather than as a deliberate boundary.
     fixed = (sweep[(sweep["algorithm"] != "HDBSCAN") & (sweep["k"] <= 20)]
              .rename(columns=rename)
              [["Algorithm", "k", "SI", "DBI", "CHI", "Stability (ARI)"]]
              .sort_values(["Algorithm", "k"]))
 
-    # Prediction strength and PAC are the criteria the reported partition was
-    # actually selected on, so they belong in the sweep table rather than in a
-    # separate file. Without them Table S9 would show a reader only the
-    # compactness indices - the ones that do not turn over on this corpus and
-    # did not choose k - and the selection would look unsupported.
     sel_path = TABLES / "select_k_raw.xlsx"
     if sel_path.exists():
         sel = (pd.read_excel(sel_path)
@@ -122,8 +96,6 @@ def table_s10(tag: str = "") -> pd.DataFrame:
 
 
 def main() -> None:
-    # Tagged like the rest of stage 03: the revision reports two partitions and
-    # each needs its own Table S10 without clobbering the other.
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--tag", default="", help="partition suffix, e.g. _k4")
     ap.add_argument("--s10", default="TableS10_cluster_composition.xlsx")

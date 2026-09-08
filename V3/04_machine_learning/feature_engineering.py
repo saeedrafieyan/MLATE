@@ -1,43 +1,3 @@
-"""
-Does domain feature engineering close the protocol gap?
-=======================================================
-
-    python 04_machine_learning/feature_engineering.py
-
-The benchmark's own result motivates this test. Bernoulli naive Bayes - which
-treats every feature as an independent binary indicator - leads the grouped
-leaderboard on all three tasks, which says the transferable signal is close to
-"which components are present" rather than their exact amounts. If that is
-right, then features encoding *what kind* of component is present, rather than
-*which specific* one, should transfer better: a laboratory using a different
-gelatin-like polymer becomes recognisable instead of looking unrelated.
-
-Feature blocks
---------------
-class_agg  total concentration within each of the 13 biomaterial classes of the
-           curated taxonomy. Gelatin and collagen are different columns but the
-           same class, so a study substituting one for the other is invisible to
-           the raw matrix and obvious here.
-totals     total polymer, total crosslinker, crosslinker-to-polymer ratio and
-           number of distinct components. Formulation-level descriptors that do
-           not depend on which specific materials were chosen.
-physics    a wall-shear-stress proxy and a speed-to-diameter ratio. For flow
-           through a cylindrical nozzle the wall shear stress is
-           tau = dP * D / (4L); with nozzle length unknown but roughly constant
-           across the corpus, the product of extrusion pressure and nozzle
-           diameter is proportional to it. The model currently sees pressure and
-           diameter as unrelated numbers, but the physics combines them, and
-           shear stress is the mechanism by which extrusion damages cells.
-all        every block at once.
-
-Leakage
--------
-Every engineered feature is a row-wise function of that row's own values, so
-computing them on the full frame cannot leak. The fold-dependent steps -
-imputing a missing engineered value and scaling - are fitted on the training
-partition only, exactly as in the main pipeline.
-"""
-
 from __future__ import annotations
 
 import sys
@@ -73,19 +33,16 @@ CROSSLINK_CLASSES = {"crosslinker", "initiator"}
 
 
 def engineer(df: pd.DataFrame, columns) -> dict[str, pd.DataFrame]:
-    """Build each feature block. Row-wise only."""
     tax = load_taxonomy().set_index("column")["material_class"]
     bio = df[columns.biomaterials].fillna(0.0)
     present = bio > 0
 
-    # ── class aggregates ────────────────────────────────────────────────────
     class_agg = pd.DataFrame(index=df.index)
     for cls in sorted(set(tax.values)):
         cols = [c for c in columns.biomaterials if tax.get(c) == cls]
         class_agg[f"class_sum[{cls}]"] = bio[cols].sum(axis=1)
         class_agg[f"class_n[{cls}]"] = present[cols].sum(axis=1)
 
-    # ── formulation totals ──────────────────────────────────────────────────
     poly_cols = [c for c in columns.biomaterials
                  if tax.get(c) in POLYMER_CLASSES]
     xl_cols = [c for c in columns.biomaterials
@@ -95,19 +52,16 @@ def engineer(df: pd.DataFrame, columns) -> dict[str, pd.DataFrame]:
     totals = pd.DataFrame({
         "total_polymer": total_polymer,
         "total_crosslinker": total_xl,
-        # Guarded: a formulation with no polymer would divide by zero.
         "crosslinker_per_polymer": total_xl / total_polymer.replace(0, np.nan),
         "n_components": present.sum(axis=1),
         "n_material_classes": class_agg[[c for c in class_agg
                                          if c.startswith("class_n")]].gt(0).sum(axis=1),
     }, index=df.index)
 
-    # ── printing physics ────────────────────────────────────────────────────
     P = pd.to_numeric(df["Extrusion Pressure (kPa)"], errors="coerce")
     D = pd.to_numeric(df["Nozzle Diameter (µm)"], errors="coerce")
     V = pd.to_numeric(df["Nozzle Movement Speed (mm/s)"], errors="coerce")
     physics = pd.DataFrame({
-        # tau_wall = dP*D/(4L); L unknown but near-constant, so tau ~ P*D.
         "shear_stress_proxy": P * D,
         "pressure_per_diameter": P / D.replace(0, np.nan),
         "speed_per_diameter": V / D.replace(0, np.nan),
@@ -141,7 +95,6 @@ def run(df, columns, task, protocol, block, parts, budget) -> list[dict]:
             e = extra_all.loc[sub.index]
             etr = e.iloc[fold.train_idx].to_numpy(dtype=float)
             ete = e.iloc[fold.test_idx].to_numpy(dtype=float)
-            # Impute and scale on the training partition only.
             med = np.nanmedian(etr, axis=0)
             med = np.where(np.isnan(med), 0.0, med)
             etr = np.where(np.isnan(etr), med, etr)

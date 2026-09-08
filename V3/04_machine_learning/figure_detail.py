@@ -1,32 +1,3 @@
-"""
-Per-class detail for the leading conventional model
-===================================================
-
-    python 04_machine_learning/figure_detail.py
-
-Figure 5 ranks the field; this looks inside the winner. Four panels per target:
-per-class precision/recall/F1 under each protocol, and the confusion matrix
-under each.
-
-Why per-class at all
---------------------
-Referee 1, comment 2: "because the reported metrics are weighted aggregates,
-per-class precision/recall/F1, confusion matrices, and confidence intervals
-would give a clearer picture of performance on minority classes." A weighted F1
-of 0.77 on Cell Response is compatible with never predicting class 2 at all -
-121 rows in the whole corpus, about 24 in a test partition - and only a
-per-class view shows which of those two situations obtains.
-
-Support is printed on every class for that reason. A recall of 0.50 means
-something different at n = 24 than at n = 320, and the figure should not make
-the reader look it up.
-
-Classes with no bars are not missing data. A precision, recall and F1 of
-exactly zero means the model never predicted that class - under study grouping
-the leading Cell Response model predicts neither class 2 nor class 4 even once
-- so those bars are zero-length and are labelled "0.00" to say so.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -55,8 +26,6 @@ CLASS_META = {
                      2: "extrudable", 3: "optimised"},
     "cell_response": {1: "no cells", 2: "inadequate", 3: "good short",
                       4: "good short, poor long", 5: "good short + long"},
-    # Same scale minus class 1, which is "no cells were included" and not a
-    # biological response at all - Referee 2, comment 3.
     "cell_response_cellular": {2: "inadequate", 3: "good short",
                                4: "good short, poor long",
                                5: "good short + long"},
@@ -74,29 +43,18 @@ def per_class_panel(ax, block: pd.DataFrame, task: str, title: str,
         ax.barh(y + (1 - k) * width, vals, height=width,
                 color=ms.CATEGORICAL[k], label=metric.capitalize(),
                 zorder=3)
-        # A zero-length bar is indistinguishable from a bar that was never
-        # drawn, and here the difference matters: a score of exactly 0 means
-        # the model never predicted that class at all, which is a finding
-        # rather than an absence of data.
         for i, v in enumerate(vals):
             if v <= 0:
                 ax.annotate("0.00", (0.0, y[i] + (1 - k) * width),
                             xytext=(3, 0), textcoords="offset points",
                             size=4.8, color=ms.CATEGORICAL[k], va="center",
                             ha="left", zorder=5)
-    # Support at the right margin rather than under the bars, where it
-    # collided with the next class group. A recall of 0.50 means something
-    # different at n = 24 than at n = 310, so the count has to be on the
-    # figure - Referee 1 comment 2 asks for exactly this visibility.
     for i, (_, r) in enumerate(block.iterrows()):
         ax.annotate(f"n = {int(r['support'])}", (0.985, y[i]),
                     xytext=(0, 0), textcoords="offset points", size=5.2,
                     color=ms.MUTED, va="center", ha="right",
                     path_effects=ms.halo(2.0))
     ax.set_yticks(y)
-    # Class names appear once, on the left panel. Both panels show the same
-    # classes in the same order, so repeating them on the right only creates a
-    # column of text for panel A's support counts to collide with.
     ax.set_yticklabels(
         [f"{c} · {CLASS_META[task].get(c, '')}" for c in labels]
         if show_labels else [], size=6)
@@ -111,18 +69,11 @@ def per_class_panel(ax, block: pd.DataFrame, task: str, title: str,
 def confusion_panel(ax, block: pd.DataFrame, task: str, title: str):
     cm = block.set_index("truth")
     cm = cm[[c for c in cm.columns if str(c).startswith("pred_")]]
-    # The sheet holds both targets, so it carries the UNION of their class
-    # columns: a printability block still has pred_4 and pred_5, all NaN.
-    # Those columns belong to the other task and must go, or the matrix gains
-    # two phantom classes.
     cm = cm.dropna(axis=1, how="all")
     cm = cm.loc[:, ~(cm.isna().all(axis=0))]
     cm = cm[cm.notna().any(axis=1)]
     counts = cm.to_numpy(dtype=float)
     counts = np.nan_to_num(counts)
-    # Row-normalised: the question is "of the samples that truly are class k,
-    # where did they go", which raw counts obscure when the classes are as
-    # unbalanced as these.
     with np.errstate(invalid="ignore", divide="ignore"):
         frac = counts / counts.sum(axis=1, keepdims=True)
     ax.imshow(np.nan_to_num(frac), cmap=ms.SEQ_NAVY, vmin=0, vmax=1,

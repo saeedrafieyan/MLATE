@@ -1,24 +1,3 @@
-"""
-Per-model results for the deep and foundation benchmarks, with configurations
-=============================================================================
-
-    python 05_deep_learning/table_dl_detail.py
-
-The counterpart to 04_machine_learning/table_ml_detail.py, and written the same
-way: metrics and the configuration that produced them on one row, so a reader
-reproducing a number does not have to join two files by hand.
-
-The two families are reported in one sheet per target rather than separately,
-because the comparison the manuscript makes is between them - a zero-shot
-foundation model against a network trained on this corpus - and splitting them
-across sheets would put the two halves of that comparison on different pages.
-
-Foundation models are zero-shot and have no tuned hyperparameters. Their
-configuration cell records what actually determines their behaviour: the
-checkpoint, the ensemble size, and the number of context rows they were given.
-Leaving it blank would read as a missing search rather than as an absent one.
-"""
-
 from __future__ import annotations
 
 import json
@@ -54,13 +33,11 @@ METRICS = [
     ("log_loss", "Log loss"), ("n_scored", "n test"),
 ]
 
-# Same five as the ML summary, so the two tables can be read side by side.
 COMPACT = ["Accuracy", "F1 (weighted)", "F1 (macro)", "MCC",
            "AUC (weighted OvR)"]
 
 
 def pretty_params(raw) -> str:
-    """The search result as a readable cell rather than raw JSON."""
     if not isinstance(raw, str) or not raw.strip():
         return ""
     try:
@@ -76,12 +53,6 @@ def pretty_params(raw) -> str:
 
 
 def foundation_config(model: str) -> str:
-    """
-    What determines a zero-shot model's behaviour, in place of a search.
-
-    The context row count is the corpus itself: an in-context learner is given
-    the training partition rather than fitted to it.
-    """
     checkpoint = ("tabpfn-v2.6-classifier-v2.6_default.ckpt"
                   if model.startswith("TabPFN") else "TabICL v2 (auto-download)")
     tuning = ("; inference tuning: temperature calibration and per-class "

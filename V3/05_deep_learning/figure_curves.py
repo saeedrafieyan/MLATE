@@ -1,26 +1,3 @@
-"""
-Deep-learning training curves
-=============================
-
-    python 05_deep_learning/figure_curves.py
-
-The supplementary figure of the submitted manuscript plotted training against
-validation loss for each architecture; this is its replacement, drawn from the
-per-epoch histories the tuner now persists.
-
-It is worth having for a reason the submitted version could not show. Each
-panel carries BOTH protocols, so the reader sees not only whether an
-architecture overfits but whether it overfits *differently* when whole studies
-are held out. A curve pair that separates only under grouping is a model
-memorising publications rather than formulations - which is the paper's central
-claim, visible in the optimisation itself rather than inferred from a final
-score.
-
-Early stopping means the curves have unequal lengths; each is drawn to its own
-last epoch and the selected epoch is marked, so a short curve reads as "stopped
-improving" rather than as missing data.
-"""
-
 from __future__ import annotations
 
 import sys
@@ -79,7 +56,6 @@ def main() -> None:
                         lw=1.0, zorder=3)
                 ax.plot(cur["epoch"], cur["val_loss"], color=colour, lw=1.0,
                         ls=(0, (2.5, 1.6)), zorder=3)
-                # The epoch whose weights were kept, not the last one run.
                 best = cur.loc[cur["val_macro_f1"].idxmax()]
                 ax.scatter([best["epoch"]], [best["val_loss"]], s=13,
                            facecolor="white", edgecolor=colour, lw=0.9,

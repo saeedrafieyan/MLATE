@@ -1,20 +1,3 @@
-"""
-Headless scaffold optimisation, and optionally a generated protocol
-===================================================================
-
-    python 06_webapp/run_optimization.py --cell-line bMSCs --trials 200
-    python 06_webapp/run_optimization.py --cell-line NoCellCultured
-    python 06_webapp/run_optimization.py --cell-line HepG2 --protocol
-
-Exists so that the optimisation described in the manuscript can be run,
-reported and reproduced without a browser. In the previous release the
-objective lived inside the Streamlit application, which meant no result from it
-could appear in a paper except as a screenshot.
-
-Writes the search history, the winning formulation, its distance from the
-observed data, and any generated protocol to results/06_webapp/.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -36,9 +19,6 @@ from mlate.dataset import load_dataset
 
 OUT = cfg.step_dir("06_webapp", "tables")
 
-# A worked example, chosen to exercise the search rather than to recommend a
-# formulation: an alginate-gelatin system with ionic crosslinking, which is the
-# most common family in the corpus and therefore the best supported by data.
 DEMO_SPACE = {
     "biomaterials": [("Alginate (%w/v)", 1.0, 8.0, 0.5),
                      ("Gelatin (%w/v)", 2.0, 12.0, 0.5),
@@ -55,13 +35,6 @@ DEMO_SPACE = {
 
 
 def pick_model(task: str, name: str | None):
-    """
-    Best benchmarked random-split model for a target, or a named one.
-
-    Searches all three families through the serving layer, so `--llm`-style
-    naming reaches TabICL and the deep networks as well as the pickled
-    classifiers.
-    """
     stubs = serving.discover(cfg.MODEL_DIR, task, "random")
     if not stubs:
         raise SystemExit(f"no deployable models for {task}")

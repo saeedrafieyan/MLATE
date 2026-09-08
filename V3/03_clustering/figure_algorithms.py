@@ -1,35 +1,3 @@
-"""
-Which clustering algorithm, and why (Figure S16)
-================================================
-
-    python 03_clustering/figure_algorithms.py
-
-The algorithm and the number of clusters were chosen together, not in sequence:
-selecting k inside an algorithm picked on other grounds would beg the question,
-since a different algorithm can prefer a different k. Every criterion was
-therefore computed for all five fixed-k algorithms over k = 2..20 - 95
-configurations - and the winner is the single best cell of that grid.
-
-  A  prediction strength against k, one line per algorithm. This is the
-     criterion that decided the analysis. Only four cells in the grid reach the
-     0.80 threshold and three of those are the trivial two-way split; the
-     reported partition, bisecting k-means at k = 4, is the only configuration
-     at k > 3 anywhere to exceed 0.75, and is a local maximum within its own
-     algorithm. The circle marks the grid's single highest value, k-means at
-     k = 3, which is NOT the reported partition - select_k.py and the Methods
-     give the reasons.
-  B  PAC against k. Lower is better. It is computed from an independent
-     procedure - consensus over resamples rather than prediction on held-out
-     halves - so agreement between the two panels is not one statistic
-     restated.
-  C  the verdict as a ranking: each algorithm's best prediction strength
-     anywhere in its own sweep.
-  D  HDBSCAN, which is reported but not ranked against the others. It selects
-     its own number of clusters and assigns low-density points to a noise
-     class, so its high silhouette is not comparable: it achieves 0.63-0.68
-     while discarding 41-79% of the corpus.
-"""
-
 from __future__ import annotations
 
 import sys
@@ -80,7 +48,6 @@ def main() -> None:
         ax.set_xticks(list(range(2, 21, 2)))
         ms.grid_axis(ax, "y")
 
-    # ── A. the deciding criterion ───────────────────────────────────────────
     ax = fig.add_subplot(gs[0, 0])
     curves(ax, "prediction_strength", "prediction strength", "higher better")
     ax.axhline(PS_THRESHOLD, color=ms.RUST, lw=0.9, ls=(0, (2, 2)), zorder=1)
@@ -92,7 +59,6 @@ def main() -> None:
     ax.legend(loc="lower left", bbox_to_anchor=(0, 1.02), ncol=2, fontsize=5.6)
     ms.panel_tag(ax, "A", dx=-0.17, dy=1.30)
 
-    # ── B. the independent confirmation ─────────────────────────────────────
     ax = fig.add_subplot(gs[0, 1])
     curves(ax, "pac", "PAC", "lower better")
     ax.scatter([best.k], [best.pac], s=60, facecolor="none",
@@ -101,7 +67,6 @@ def main() -> None:
     ax.set_title("an independent criterion, agreeing on the same cell",
                  size=6.4, color=ms.MUTED, pad=4)
 
-    # ── C. the verdict ──────────────────────────────────────────────────────
     ax = fig.add_subplot(gs[1, 0])
     y = np.arange(len(order))
     ax.barh(y, order.to_numpy(), height=0.6,
@@ -121,7 +86,6 @@ def main() -> None:
     ms.grid_axis(ax, "x")
     ms.panel_tag(ax, "C", dx=-0.52, dy=1.13)
 
-    # ── D. HDBSCAN, reported but not ranked ─────────────────────────────────
     ax = fig.add_subplot(gs[1, 1])
     noise = 100 * hdb["n_noise"] / N_ROWS
     ax.plot(hdb["k"], noise, marker="o", ms=3.4, lw=1.6, color=ms.RUST,
@@ -141,8 +105,6 @@ def main() -> None:
     twin.set_ylabel("silhouette", color=ms.NAVY)
     twin.tick_params(axis="y", colors=ms.NAVY)
     twin.set_ylim(0, 1.0)
-    # Two axes with two series needs a key: colouring the axis labels tells a
-    # reader which scale belongs to which line, but not what either line is.
     handles = ax.get_legend_handles_labels()[0] +         twin.get_legend_handles_labels()[0]
     labels_d = ax.get_legend_handles_labels()[1] +         twin.get_legend_handles_labels()[1]
     ax.legend(handles, labels_d, loc="lower right", fontsize=5.6,

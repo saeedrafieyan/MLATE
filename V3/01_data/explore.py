@@ -1,31 +1,3 @@
-"""
-MLATE V3 — exploratory analysis
-===============================
-
-Regenerates every descriptive figure and table against the frozen dataset.
-Run after build_clean_dataset.py; run before any modelling.
-
-    python explore_dataset.py
-
-Figures  -> codes/figures/   (PDF + 600-dpi PNG)
-Tables   -> codes/tables/    (one Excel workbook per table)
-
-Main text
-  fig1_dataset_growth        V2 vs V3 scale
-  fig2_biomaterial_taxonomy  130 materials by functional class
-  fig3_overview              A bioprint/3D-print  B top cell lines  C targets
-  fig4_tissue_composition    NEW - required by R1-1 and R2-6
-  fig7_material_classes      class frequency
-
-Supplementary
-  figS1_study_distribution   named study contributions + concentration
-  figS2_material_cooccurrence top-material co-occurrence
-  figS3_cell_density         density by cell line
-  figS4_printing_parameters  parameter histograms
-  figS5_missingness          what the literature does not report
-  figS6_study_clustering     NEW - evidence for DOI-grouped validation
-"""
-
 from __future__ import annotations
 
 import sys
@@ -51,7 +23,6 @@ DATA = cfg.DATASET
 TAXONOMY = cfg.TAXONOMY
 TABLE_DIR = cfg.step_dir("01_data", "tables")
 
-# Scale of the previous release, for the growth comparison.
 V2 = {"Studies": 88, "Biomaterials": 60, "Cell lines": 49, "Samples": 1171}
 
 CLASS_ORDER = [
@@ -65,9 +36,6 @@ PRINTABILITY_LABELS = {
     0: "0  not extruded", 1: "1  liquid / beading",
     2: "2  extrudable", 3: "3  extrudable, optimised",
 }
-# The rating scale's own wording. Class 1 is defined as "no cells were
-# included"; 46 of the 1,595 rows carrying it do record a cell line and a
-# positive cell density, which the caption discloses rather than the axis.
 RESPONSE_LABELS = {
     1: "1  no cells", 2: "2  poor short-term",
     3: "3  good short-term",
@@ -78,7 +46,6 @@ ACELLULAR = "NoCellCultured"
 
 
 def pretty(name: str) -> str:
-    """Human-readable class name for axis labels."""
     return name.replace("_", " ")
 
 
@@ -92,31 +59,7 @@ def load() -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
     return df, tax, biomaterials
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# MAIN-TEXT FIGURES
-# ─────────────────────────────────────────────────────────────────────────────
-# Figure 1 is built by 01_data/figure_dataset_growth.py, not here. Two scripts
-# writing the same filename is how a figure and its caption drift apart: this
-# one counted studies without URL-decoding the DOIs (222, not 220) and counted
-# the acellular token as a cell line (187, not 186), so whichever ran last won.
-
 def fig_biomaterial_taxonomy(tax) -> None:
-    """
-    Circular dendrogram: root at the centre, one node per material class, a
-    leaf per material.
-
-    Closed rather than open. The previous version reserved a six-degree gap at
-    each end of the spoke sequence, which left a visible wedge between the last
-    leaf and the first and made the sequence read as a broken arc with two
-    endpoints. Nothing in a taxonomy justifies that: the classes have no first
-    or last, so the leaves are placed on the full turn with `endpoint=False`
-    and the spacing across the wrap is the same as everywhere else.
-
-    The hierarchy is drawn rather than implied. Each class gets an arc spanning
-    its members and a radial link back to the root, so the two levels of the
-    taxonomy are visible as structure instead of only as colour - which is what
-    makes it a dendrogram rather than a coloured wheel.
-    """
     t = tax.copy()
     t["material_class"] = pd.Categorical(t["material_class"],
                                          CLASS_ORDER, ordered=True)
@@ -142,14 +85,10 @@ def fig_biomaterial_taxonomy(tax) -> None:
         colour = ms.MATERIAL_CLASS_COLORS[cls]
         a0, a1 = block["theta"].min(), block["theta"].max()
 
-        # The arc is padded by half a leaf spacing so that adjacent classes
-        # meet midway between their outermost leaves instead of stopping short
-        # and leaving a hairline of background between them.
         arc = np.linspace(a0 - step / 2, a1 + step / 2, 64)
         ax.plot(arc, np.full_like(arc, R_NODE), color=colour, lw=2.0,
                 solid_capstyle="butt", zorder=2)
 
-        # Root link, drawn to the angular centre of the class.
         mid = (a0 + a1) / 2
         ax.plot([mid, mid], [R_ROOT, R_NODE], color=colour, lw=1.4,
                 solid_capstyle="butt", zorder=2)
@@ -161,8 +100,6 @@ def fig_biomaterial_taxonomy(tax) -> None:
                 solid_capstyle="butt", alpha=0.85, zorder=1)
         ax.plot([ang, ang], [R_LEAF, R_TIP], color=colour, lw=1.5,
                 solid_capstyle="round", alpha=0.9, zorder=1)
-        # The axes are offset by +90 deg and run clockwise, so readability
-        # depends on the on-screen angle, not the data angle.
         screen = (90 - np.rad2deg(ang)) % 360
         flip = 90 < screen <= 270
         ax.text(ang, R_TIP + 0.035, row["display_name"],
@@ -173,11 +110,6 @@ def fig_biomaterial_taxonomy(tax) -> None:
 
     ax.set_ylim(0, 1.34)
 
-    # The root, drawn as a node rather than left implicit. Without it the class
-    # links ran under the centre label - two of them straight through the word
-    # - and the label competed with thirteen coloured lines for the same
-    # pixels. The disc terminates every link at one radius and gives the text a
-    # clean ground.
     ax.add_patch(Circle((0, 0), 0.185, transform=ax.transData._b,
                         facecolor="white", edgecolor=ms.GRIDLINE,
                         lw=0.8, zorder=3))
@@ -200,16 +132,6 @@ def fig_overview(df) -> None:
     fig = plt.figure(figsize=(ms.WIDTHS["double"], 4.4))
     gs = fig.add_gridspec(2, 2, height_ratios=[1, 1.05], hspace=0.45, wspace=0.3)
 
-    # A - split by the cell-response label, so the panel agrees with D
-    #
-    # Derived from Cell Response, not from the Cell Line column. Those two
-    # disagree for 70 samples: 46 carry a cell line but no recorded cellular
-    # outcome, and 24 are acellular yet carry an outcome rating. Taking the
-    # split from the cell line gave 1,573 here against 1,595 in panel D, and
-    # a reader comparing two panels of one figure is entitled to the same
-    # number. The wedges are labelled by what the class means - whether a
-    # cellular outcome was recorded - rather than as "bioprinted" and "3D
-    # printed", which these counts do not exactly describe.
     ax = fig.add_subplot(gs[0, 0])
     with_outcome = int((df["Cell Response"] != 1).sum())
     vals = [with_outcome, len(df) - with_outcome]
@@ -217,8 +139,6 @@ def fig_overview(df) -> None:
                        radius=0.86,
                        wedgeprops=dict(width=0.36, edgecolor="white", lw=1.2))
     ax.text(0, 0, f"{len(df):,}\nsamples", ha="center", va="center", size=8)
-    # Anchor each label on the side it belongs to so the text grows away from
-    # the ring instead of across it.
     for w, lab, v in zip(wedges, ["bioprinted", "3D printed"], vals):
         a = np.deg2rad((w.theta1 + w.theta2) / 2)
         x, y = 1.02 * np.cos(a), 1.02 * np.sin(a)
@@ -230,7 +150,6 @@ def fig_overview(df) -> None:
     ax.set_ylim(-1.15, 1.15)
     ms.panel_tag(ax, "A", dx=-0.02, dy=1.06)
 
-    # B - most frequent cell lines
     ax = fig.add_subplot(gs[0, 1])
     top = (df.loc[df["Cell Line"] != ACELLULAR, "Cell Line"]
              .value_counts().head(12).iloc[::-1])
@@ -245,7 +164,6 @@ def fig_overview(df) -> None:
     ms.despine(ax, keep=("left",))
     ms.panel_tag(ax, "B", dx=-0.42, dy=1.02)
 
-    # C - target distributions
     for j, (col, labels, cmap) in enumerate([
         ("Printability", PRINTABILITY_LABELS, ms.SEQ_NAVY),
         ("Cell Response", RESPONSE_LABELS, ms.SEQ_TEAL),
@@ -270,7 +188,6 @@ def fig_overview(df) -> None:
 
 
 def fig_tissue_composition(df) -> None:
-    """NEW - the tissue coverage summary R1-1 and R2-6 asked for."""
     counts = df["target_tissue"].value_counts()
     fig, ax = ms.figure("onehalf", height=3.4)
 
@@ -307,31 +224,13 @@ def fig_material_classes(tax) -> None:
     ms.save(fig, step="01_data", name="fig7_material_classes")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SUPPLEMENTARY FIGURES
-# ─────────────────────────────────────────────────────────────────────────────
 def normalise_doi(doi: str) -> str:
-    """Canonical DOI for grouping.
-
-    Two records in the corpus carry a URL-encoded slash (`%2f`) and would
-    otherwise be counted as separate studies from the same publication. That
-    matters beyond this figure: DOI is the grouping key for the study-grouped
-    validation protocol, so an un-normalised duplicate lets rows from one
-    publication fall on both sides of the split.
-    """
     d = str(doi).strip().lower()
     d = d.replace("%2f", "/").replace("https://doi.org/", "")
     return d.replace("doi.org/", "").rstrip(".").strip()
 
 
 def tidy_reference(ref: str) -> str:
-    """'Sohyung Lee et al, 2020' -> 'Lee et al. 2020'.
-
-    The Reference column was filled in by hand over several years, so the same
-    convention appears with commas, semicolons, given names and initials. A
-    figure needs one form, and a surname plus a year is what a reader
-    recognises.
-    """
     s = " ".join(str(ref).split())
     year = ""
     m = re.search(r"(1[89]\d{2}|20\d{2})", s)
@@ -354,11 +253,6 @@ def tidy_reference(ref: str) -> str:
 
 
 def squarify(values, x, y, dx, dy):
-    """Squarified treemap layout. Returns (x, y, w, h) per value.
-
-    Hand-rolled rather than adding a dependency: the algorithm is twenty lines
-    and the figure pipeline should not grow a package for one panel.
-    """
     total = sum(values)
     scaled = [v * dx * dy / total for v in values]
     rects, i = [], 0
@@ -398,7 +292,6 @@ def squarify(values, x, y, dx, dy):
 
 
 def study_contributions(df) -> pd.DataFrame:
-    """One row per publication, ranked by how many samples it contributed."""
     d = df.copy()
     d["_doi"] = d["DOI"].map(normalise_doi)
     g = (d.groupby("_doi")
@@ -409,8 +302,6 @@ def study_contributions(df) -> pd.DataFrame:
           .sort_values("samples", ascending=False))
     g["label"] = g.reference.map(tidy_reference)
 
-    # Two studies can tidy to the same surname and year; suffix them so the
-    # figure never shows one label against two different bars.
     dup = g.label.duplicated(keep=False)
     for lab in g.loc[dup, "label"].unique():
         for k, idx in enumerate(g.index[g.label == lab]):
@@ -426,13 +317,6 @@ STUDY_TOP_N = 30
 
 
 def fig_study_distribution(df) -> None:
-    """Which publications the corpus actually rests on.
-
-    Replaces the anonymous rank-ordered bar chart of the submitted version.
-    That figure showed the shape of the distribution but named nobody, so a
-    reader could not tell whether the corpus leans on a handful of large
-    studies - which, as panel C shows, it does.
-    """
     g = study_contributions(df)
     total = g.samples.sum()
 
@@ -440,7 +324,6 @@ def fig_study_distribution(df) -> None:
     gs = fig.add_gridspec(2, 2, width_ratios=[1.0, 1.12],
                           height_ratios=[1.32, 1.0], wspace=0.30, hspace=0.42)
 
-    # ---- A  the named leaderboard ---------------------------------------
     axA = fig.add_subplot(gs[:, 0])
     top = g.head(STUDY_TOP_N).iloc[::-1]
     bars = axA.barh(range(len(top)), top.samples.values, color=ms.NAVY,
@@ -454,7 +337,6 @@ def fig_study_distribution(df) -> None:
     ms.label_bars(axA, bars, top.samples.values, horizontal=True, size=5.6)
     ms.panel_tag(axA, "A", dx=-0.42, dy=1.03)
 
-    # ---- B  all studies, area-proportional ------------------------------
     axB = fig.add_subplot(gs[0, 1])
     side = 100.0
     rects = squarify(list(g.samples.values), 0, 0, side, side)
@@ -468,13 +350,10 @@ def fig_study_distribution(df) -> None:
             pending.append((x + w / 2, y + h / 2, w, h,
                             row.label.replace(" et al.", "")))
     axB.set_xlim(0, side)
-    axB.set_ylim(side, 0)          # rank 1 top-left, so the panel reads like text
+    axB.set_ylim(side, 0)
     axB.set_aspect("equal")
     axB.axis("off")
 
-    # Label only where the glyphs actually fit inside the tile. Measuring the
-    # drawn extent beats estimating from the character count: the serif face
-    # and the varying name lengths make any estimate wrong at 4.6 pt.
     fig.canvas.draw()
     rend = fig.canvas.get_renderer()
     inv = axB.transData.inverted()
@@ -489,8 +368,6 @@ def fig_study_distribution(df) -> None:
                      color="white")
         if fits(t, w, h):
             continue
-        # The name will not fit, but the rank still identifies the study
-        # against panel A, which is ordered the same way.
         t.remove()
         t = axB.text(cx, cy, str(rank), ha="center", va="center", size=4.6,
                      color="white")
@@ -507,7 +384,6 @@ def fig_study_distribution(df) -> None:
                   size=7, color=ms.MUTED, pad=3)
     ms.panel_tag(axB, "B", dx=-0.04, dy=1.12)
 
-    # ---- C  concentration -----------------------------------------------
     axC = fig.add_subplot(gs[1, 1])
     cum = g.cumulative_pct.values
     xs = np.arange(1, len(g) + 1)
@@ -517,12 +393,9 @@ def fig_study_distribution(df) -> None:
         axC.plot([k, k], [0, cum[k - 1]], color=colour, lw=0.9, ls="--")
         axC.plot([0, k], [cum[k - 1]] * 2, color=colour, lw=0.9, ls="--")
         axC.plot([k], [cum[k - 1]], "o", color=colour, ms=2.6)
-        # Below the marker rather than above: the band above the curve is too
-        # thin here for two labels, and the shaded area below is empty.
         axC.text(k + 5, cum[k - 1] - 7.0,
                  f"top {k} studies → {cum[k - 1]:.0f}%",
                  size=6.0, color=colour, va="top", ha="left")
-    # Carried over from the histogram panel this figure replaces.
     axC.text(len(g) * 0.98, 6,
              f"median {int(g.samples.median())} samples per study\n"
              f"{int((g.samples == 1).sum())} studies contribute one",
@@ -643,10 +516,8 @@ def fig_missingness(df, biomaterials) -> None:
 
 
 def fig_study_clustering(df, biomaterials) -> None:
-    """NEW - the empirical case for DOI-grouped validation."""
     fig, axes = ms.figure("double", height=2.5, ncols=3)
 
-    # A - between-study share of label variance
     ax = axes[0]
     shares = []
     for t in ["Printability", "Cell Response"]:
@@ -662,7 +533,6 @@ def fig_study_clustering(df, biomaterials) -> None:
     ms.grid_axis(ax, "y")
     ms.panel_tag(ax, "A", dx=-0.3)
 
-    # B - how identifiable a study is from its formulation signature
     ax = axes[1]
     pattern = (df[biomaterials].fillna(0) != 0).astype(int).astype(str).agg("".join, axis=1)
     frames = {
@@ -683,7 +553,6 @@ def fig_study_clustering(df, biomaterials) -> None:
     ms.grid_axis(ax, "y")
     ms.panel_tag(ax, "B", dx=-0.3)
 
-    # C - how often a test row would have a same-study sibling in training
     ax = axes[2]
     per = df.groupby("DOI").size()
     fracs = [100 * sum(k * (1 - (1 - f) ** (k - 1)) for k in per) / len(df)
@@ -702,13 +571,9 @@ def fig_study_clustering(df, biomaterials) -> None:
     ms.save(fig, step="01_data", name="figS6_study_clustering")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# TABLES
-# ─────────────────────────────────────────────────────────────────────────────
 def write_tables(df, tax, biomaterials) -> None:
     TABLE_DIR.mkdir(parents=True, exist_ok=True)
 
-    # S1 - biomaterial statistics over samples where the material is present
     rows = []
     for _, r in tax.iterrows():
         s = df[r["column"]]
@@ -728,7 +593,6 @@ def write_tables(df, tax, biomaterials) -> None:
     s1 = pd.DataFrame(rows).sort_values("Samples", ascending=False)
     s1.to_excel(TABLE_DIR / "tableS1_biomaterials.xlsx", index=False)
 
-    # S2 - cell lines
     d = df[df["Cell Line"] != ACELLULAR]
     dens = d.groupby("Cell Line")["Cell Density (million cells/mL)"]
     s2 = pd.DataFrame({
@@ -741,7 +605,6 @@ def write_tables(df, tax, biomaterials) -> None:
     }).sort_values("Samples", ascending=False).reset_index()
     s2.to_excel(TABLE_DIR / "tableS2_cell_lines.xlsx", index=False)
 
-    # S3 - tissue composition (new, answers R1-1 / R2-6)
     s3 = pd.DataFrame({
         "Samples": df.groupby("target_tissue").size(),
         "Studies": df.groupby("target_tissue")["DOI"].nunique(),
@@ -756,7 +619,6 @@ def write_tables(df, tax, biomaterials) -> None:
     s3["% of dataset"] = (100 * s3["Samples"] / len(df)).round(1)
     s3.to_excel(TABLE_DIR / "tableS3_tissue_composition.xlsx", index=False)
 
-    # headline summary
     summary = pd.DataFrame([
         ("Samples", len(df), V2["Samples"]),
         ("Studies (unique DOI)", df["DOI"].nunique(), V2["Studies"]),

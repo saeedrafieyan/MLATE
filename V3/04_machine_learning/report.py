@@ -1,30 +1,3 @@
-"""
-Score the tuned benchmark
-=========================
-
-    python 04_machine_learning/report.py
-
-Reads the stored predictions written by tuning.py and produces every table the
-manuscript needs. Nothing is refitted here, so the scoring can be revised
-without touching the compute that produced the predictions.
-
-Sheets written to tuned_benchmark.xlsx:
-
-  leaderboard     one row per model x task x protocol x selection x split,
-                  the full sixteen-metric panel, with bootstrap intervals on
-                  the test rows
-  test            the same, filtered to split == "test" and the primary
-                  selection - the table the main text quotes
-  overfitting     train minus test, the diagnostic that separates a model that
-                  could not learn from one that learned study structure
-  protocol_gap    random versus study-grouped for the same model
-  per_class       precision, recall, F1 and support per class for the leaders
-  confusion       confusion matrices for the same
-
-Training rows are retained but never presented as results; every sheet that
-carries them labels the split explicitly.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -43,7 +16,7 @@ from mlate import style as ms
 
 TABLES = cfg.step_dir("04_machine_learning", "tables")
 PREDS = TABLES / "predictions_tuned"
-PRIMARY = "weighted"          # the selection the main text reports
+PRIMARY = "weighted"
 
 
 def load(tasks: list[str] | None = None) -> pd.DataFrame:
@@ -61,15 +34,9 @@ def load(tasks: list[str] | None = None) -> pd.DataFrame:
 
 
 def detail(preds: pd.DataFrame, board: pd.DataFrame, top: int = 3):
-    """Per-class tables and confusion matrices for the leading models."""
     per_class, confusion = [], []
     test = board[(board["split"] == "test")]
 
-    # The set of models to detail is chosen per TASK, not per task-and-protocol,
-    # and every chosen model is then detailed under BOTH protocols. Selecting
-    # separately per protocol produces a table where the random-split winner
-    # has no grouped rows, which makes the obvious figure - one model, both
-    # protocols, side by side - impossible to draw.
     wanted: dict[str, list[str]] = {}
     for task, g in test.groupby("task"):
         cell = g[g["selection"].isin([PRIMARY, "untuned", "composed"])]

@@ -1,24 +1,3 @@
-"""
-Supplementary figure S7: imputation strategy
-============================================
-
-    python 02_preprocessing/figure_imputation.py
-
-Four panels, arranged as an argument rather than a dump of metrics:
-
-  A  why printing parameters resist imputation - the share of each column's
-     variance that lies between studies, and the share of studies that report a
-     single constant value. This is the premise everything else rests on.
-  B  what the study-grouped benchmark found - mean normalized MAE per strategy,
-     Reading A then B is the whole argument.
-  C  per-column detail behind B, as a normalized-MAE heatmap.
-  D  what was actually done - the composition of every printing-parameter
-     column after the two-tier fill.
-
-Sources: study_structure.xlsx, imputation_validation.xlsx, imputation_tiers.xlsx
-in results/02_preprocessing/tables/.
-"""
-
 from __future__ import annotations
 
 import sys
@@ -71,7 +50,6 @@ def main() -> None:
     gs = fig.add_gridspec(2, 2, hspace=0.34, wspace=0.52,
                           height_ratios=[1.0, 1.12])
 
-    # ── A. the premise: parameters are study-level ──────────────────────────
     ax = fig.add_subplot(gs[0, 0])
     s = structure.set_index("column").reindex(cols)
     y = np.arange(len(cols))
@@ -95,18 +73,10 @@ def main() -> None:
     ax.legend(loc="lower left", bbox_to_anchor=(0, 1.02), ncol=1, fontsize=5.8)
     ms.panel_tag(ax, "A", dx=-0.42, dy=1.16)
 
-    # ── B. the benchmark ────────────────────────────────────────────────────
     ax = fig.add_subplot(gs[0, 1])
-    # Best first, matching panel C. The y-axis is inverted below, so row 0
-    # renders at the top and the R2 annotation at i+0.36 sits under its bar.
     o = overall
     nmae = o["nMAE"].to_numpy(dtype=float)
 
-    # One strategy diverges to ~10 and would flatten every other bar, so the
-    # axis stops above the second-worst and that bar is broken rather than
-    # silently clipped. A clipped bar is indistinguishable from a bar that
-    # genuinely ends there; the break glyph says the value continues, and the
-    # number is printed beyond it.
     ceiling = float(np.sort(nmae)[-2]) * 1.42
     broken = nmae > ceiling
     stop = ceiling * 0.82
@@ -116,12 +86,6 @@ def main() -> None:
 
     for i, (v, cut) in enumerate(zip(nmae, broken)):
         if cut:
-            # Two diagonal strokes in the background colour, cut across the
-            # bar end: the conventional mark for a truncated bar. They have to
-            # be wide enough and far enough apart to read as a deliberate
-            # break; drawn thin they look like a rendering artefact, which is
-            # worse than no mark at all because the reader does not know the
-            # bar is truncated.
             for dx in (-0.055, -0.018):
                 ax.plot([stop + dx * ceiling,
                          stop + (dx + 0.038) * ceiling],
@@ -141,7 +105,6 @@ def main() -> None:
     ms.grid_axis(ax, "x")
     ms.panel_tag(ax, "B", dx=-0.40, dy=1.16)
 
-    # ── C. per-column detail ────────────────────────────────────────────────
     ax = fig.add_subplot(gs[1, 0])
     grid = (per_col.pivot(index="strategy", columns="column", values="nMAE")
                    .reindex(index=order, columns=cols))
@@ -166,7 +129,6 @@ def main() -> None:
     cb.outline.set_visible(False)
     ms.panel_tag(ax, "C", dx=-0.42, dy=1.10)
 
-    # ── D. the resulting matrix ─────────────────────────────────────────────
     ax = fig.add_subplot(gs[1, 1])
     t = tiers.set_index("column").reindex(cols)
     total = float(t[list(STACK)].sum(axis=1).iloc[0])

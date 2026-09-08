@@ -1,74 +1,3 @@
-"""
-Refit and ship every model, under both splitting protocols
-==========================================================
-
-    python 06_webapp/export_deployment.py --dry-run     # matrix only, no fitting
-    python 06_webapp/export_deployment.py
-    python 06_webapp/export_deployment.py --families ml --protocols doi
-
-Takes the tuned hyper-parameters from steps 04 and 05, refits each model on the
-whole dataset behind the release preprocessor, and writes a deployment bundle
-under deploy/models/ for upload to Hugging Face.
-
-What is shipped, and why all of it
-----------------------------------
-Every model, not a top-3 shortlist. The application lets a user choose the
-predictor per target, so a shortlist would decide for them; and the argument of
-the paper is that the right model depends on which regime the user is in.
-Shipping the full set makes that choice real rather than rhetorical.
-
-Both protocols, for the same reason
------------------------------------
-A model appears twice per target: once carrying the hyper-parameters chosen
-under the random split, once carrying those chosen under study-grouped
-splitting. They are genuinely different models, because the two protocols
-select different configurations, and they answer different questions.
-
-  random   interpolation inside the design space the dataset covers - adjusting
-           a concentration, swapping a cell line, moving a pressure within
-           observed ranges. This is what a user of the tool is usually doing.
-  doi      extrapolation to a study the model has never seen, which is the
-           honest bound for a genuinely new laboratory.
-
-Shipping only the random-split models would leave the conservative numbers in
-the manuscript with no artefact behind them, and shipping only the grouped ones
-would hand users a model tuned for a harder task than the one they face. The
-application selects on protocol, so the choice stays with the person who knows
-which regime they are in.
-
-Which configuration
--------------------
-Under the 80:20 hold-out design there is one tuned configuration per
-(task, protocol, model): Optuna searched inside the training partition, scored
-by 10-fold cross-validation on that partition, and `inner_score` is that
-cross-validated mean. No test row informed any hyper-parameter. Where several
-rows exist for a group the highest inner score wins, which is a no-op for the
-current single-hold-out tables but keeps the rule correct if outer folds ever
-come back.
-
-Fitted on every row
--------------------
-Each shipped model is refitted on the complete dataset behind the release
-preprocessor, which is also fitted on every row. At inference time there is no
-held-out set to protect, and a formulation submitted by a user deserves
-everything the dataset knows. The numbers in the paper come from the hold-out
-partitions and are reproducible from the stored per-row predictions under
-results/04_machine_learning/tables/predictions_tuned and its step-05
-counterparts; these artefacts are for serving, not for re-deriving the tables.
-
-Foundation models
------------------
-TabPFN and TabICL have no trained weights of ours to save - they are in-context
-learners, and the fitted object IS the training set. What ships is the
-transformed context matrix, its labels and the checkpoint identifier, so the
-application can instantiate the vendor classifier and fit it in one call. Being
-hyper-parameter-free, they carry no protocol distinction.
-
-Every artefact records its hyper-parameters, the protocol they were chosen
-under, that configuration's inner score and the model's hold-out metrics, so a
-number in the paper can always be traced to the file that produces it.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -107,16 +36,6 @@ def slugify(name: str) -> str:
 
 
 def best_params(table: Path, protocol: str, selection: str) -> pd.DataFrame:
-    """
-    One row per (task, model) for this protocol: the highest inner score.
-
-    The meta-ensembles come along under selection "composed". They have no
-    search space of their own - their configuration is the set of base
-    estimators - so they carry no inner score and cannot be filtered on one.
-    Excluding them would drop Stacking, which is the leading Cell Response
-    model, from the bundle. The dummy baselines are left out: they exist to
-    calibrate the tables, and nobody deploys a majority-class predictor.
-    """
     if not table.exists():
         return pd.DataFrame()
     df = pd.read_excel(table)
@@ -132,17 +51,6 @@ def best_params(table: Path, protocol: str, selection: str) -> pd.DataFrame:
 
 
 def holdout_metrics(path: Path, protocol: str) -> dict:
-    """
-    Test-partition metrics keyed by (task, model, selection), for the manifest.
-
-    Keyed on the selection as well as the model because one model appears under
-    up to three of them and the scores differ. An earlier version filtered to a
-    single selection before building the map, which left the two meta-ensembles
-    - exported under "composed" while everything else exports under "weighted"
-    - carrying an empty metrics block. The application ranks its menu by these
-    metrics, so Stacking, the leading Cell Response model, sorted to the bottom
-    of it.
-    """
     if not path.exists():
         return {}
     df = pd.read_excel(path)
@@ -160,16 +68,6 @@ def holdout_metrics(path: Path, protocol: str) -> dict:
 
 
 def fingerprint(path: Path) -> tuple[int, str]:
-    """
-    Size and digest from ONE read of the bytes on disk.
-
-    Not path.stat().st_size: the deployment directory lives on a Google Drive
-    mount whose metadata lags the write, so a stat() taken immediately after
-    joblib.dump or torch.save can report a size of zero for a file that is
-    perfectly intact. Reading the file back forces the data through and makes
-    the two fields consistent with each other by construction - a digest taken
-    over a partially flushed file would be worse than no digest at all.
-    """
     data = path.read_bytes()
     return len(data), hashlib.sha256(data).hexdigest()
 
@@ -300,8 +198,6 @@ def export_dl(protocol: str, selection: str, dry_run: bool,
         record["classes"] = [int(c) for c in labels]
 
         try:
-            # Early stopping still needs a held-out slice; it comes out of the
-            # training data, exactly as it did during tuning.
             sss = StratifiedShuffleSplit(n_splits=1, test_size=0.15,
                                          random_state=cfg.RANDOM_STATE)
             tr, va = next(sss.split(X, yv))
@@ -327,14 +223,6 @@ def export_dl(protocol: str, selection: str, dry_run: bool,
 
 def export_foundation(dry_run: bool,
                       skip_existing: bool = False) -> list[dict]:
-    """
-    Context sets for the in-context learners.
-
-    There are no weights of ours to ship. What the application needs is the
-    matrix these models condition on, plus the checkpoint identifier, so it can
-    build the vendor classifier and call fit() once at start-up. Protocol does
-    not enter: neither model has a hyper-parameter for a protocol to select.
-    """
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent
                            / "05_deep_learning"))
     try:
@@ -396,7 +284,6 @@ def export_foundation(dry_run: bool,
 
 
 def merge_manifest(fresh: list[dict]) -> list[dict]:
-    """Fresh records win; previously recorded artefacts still on disk survive."""
     path = OUT / "deployment_manifest.json"
     if not path.exists():
         return fresh
@@ -448,10 +335,6 @@ def main() -> None:
     if not exported:
         raise SystemExit("nothing exported")
 
-    # A partial run must not erase the rest of the bundle from the manifest.
-    # Running --families foundation, or one protocol, describes only the slice
-    # it rebuilt; entries for artefacts still sitting on disk are carried over
-    # and only the ones this run actually touched are replaced.
     if not args.dry_run:
         exported = merge_manifest(exported)
 

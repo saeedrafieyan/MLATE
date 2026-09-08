@@ -1,20 +1,3 @@
-"""
-MLATE V3 — scaffold optimisation and protocol generation
-========================================================
-
-    streamlit run 06_webapp/app.py
-
-A thin interface over `mlate.optimize`, `mlate.wssq` and `mlate.protocol`. The
-previous release put the objective function, the WSSQ formula and the language
-model call inside this file, which meant none of them could be run, tested or
-reported without launching a browser. Everything scientific now lives in the
-package; this file collects inputs, calls it, and displays the result.
-
-Deployable to a Hugging Face Space: model artefacts are located relative to
-this file, and the only corpus data required at run time is the trimmed
-reference table that `build_app_data.py` writes beside the app.
-"""
-
 from __future__ import annotations
 
 import json
@@ -45,8 +28,6 @@ from model_performance import (PERFORMANCE_GUIDE,                 # noqa: E402
 
 st.set_page_config(page_title="MLATE V3", page_icon="🧬", layout="wide")
 
-# Deployment layout: a Space carries deploy/models next to the app, a checkout
-# has it at the repository root. Both are tried so the same file runs in either.
 MODEL_ROOTS = [HERE / "deploy" / "models", cfg.ROOT / "deploy" / "models"]
 PRINT_PARAMS = ["Physical Crosslinking Duration (s)",
                 "Photo Crosslinking Duration (s)",
@@ -66,11 +47,8 @@ def models_root() -> Path | None:
     return None
 
 
-# ── loading ──────────────────────────────────────────────────────────────────
-
 @st.cache_resource(show_spinner=False)
 def load_preprocessor():
-    """The release preprocessor, fitted on every row for inference."""
     root = models_root()
     d = root / "preprocessors"
     return (joblib.load(d / "preprocessor.pkl"),
@@ -86,23 +64,6 @@ def load_manifest() -> dict:
 
 @st.cache_data(show_spinner=False)
 def available_models(task: str) -> list[dict]:
-    """
-    Every model offered for one target, ranked by benchmarked weighted F1.
-
-    All three families, not only the pickled classifiers: the previous release
-    listed the conventional models alone, which meant TabICL - the strongest
-    printability model on the benchmark - was exported, reported and then not
-    offered. Discovery costs a filename parse; an estimator is opened when it
-    is chosen.
-
-    Random-split artefacts only. The application serves prediction inside the
-    design space the corpus covers - adjusting a concentration, swapping a cell
-    line, moving a pressure within observed ranges - which is the interpolation
-    regime the random protocol estimates. The study-grouped models are the
-    conservative bound for an unseen laboratory and are reported in the
-    manuscript, but they are tuned for a harder task than the one performed
-    here. The foundation models are split-independent and appear under both.
-    """
     root = models_root()
     if root is None:
         return []
@@ -112,7 +73,6 @@ def available_models(task: str) -> list[dict]:
 
 
 def model_label(entry: dict) -> str:
-    """Menu text: the model, what kind it is, and what it scored."""
     kind = {"ml": "", "dl": " · deep", "foundation": " · foundation"}
     return (f"{entry['name']}{kind.get(entry['family'], '')} · "
             f"F1 {entry['weighted_f1']:.3f}")
@@ -120,24 +80,11 @@ def model_label(entry: dict) -> str:
 
 @st.cache_resource(show_spinner=False)
 def load_model(path_str: str, family: str):
-    """
-    Open one artefact. Cached, because a foundation model re-supplies its
-    2,646-row context on first use and there is no reason to pay that twice.
-    """
     return serving.load(Path(path_str), family)
 
 
 @st.cache_data(show_spinner=False)
 def load_corpus() -> tuple[pd.DataFrame | None, object]:
-    """
-    The observed formulations, shipped beside the app by `build_app_data.py`.
-
-    Needed for the two checks that a prediction alone cannot make: how far the
-    proposed formulation sits from anything published, and which real
-    formulations are closest to it. Returns (None, None) if the file is absent
-    rather than failing, so the application still optimises; the interface then
-    says the check could not be performed instead of implying it passed.
-    """
     table, meta = HERE / "corpus_reference.parquet", HERE / "corpus_reference.json"
     if not (table.exists() and meta.exists()):
         return None, None
@@ -147,23 +94,8 @@ def load_corpus() -> tuple[pd.DataFrame | None, object]:
 
 @st.cache_data(show_spinner=False, ttl=3600)
 def list_llms() -> tuple[list[tuple], bool]:
-    """
-    The language models on offer, checked against OpenRouter's live catalogue.
-
-    Checked rather than trusted because the catalogue turns over quickly: five
-    of the eleven identifiers shipped with the previous revision had been
-    withdrawn within weeks, and a withdrawn identifier fails only when the user
-    presses Generate, after an optimisation has already been paid for. Cached
-    for an hour so the check costs one request per session.
-
-    No key is passed. The catalogue is public, and Streamlit's cache is shared
-    across every session of a deployment, so a secret used as a cache key would
-    be a secret held on behalf of all of them.
-    """
     return proto.available_models(None)
 
-
-# ── help dialogs ─────────────────────────────────────────────────────────────
 
 @st.dialog("Weighted Synergistic Scaffold Quality (WSSQ)", width="large")
 def show_wssq_guidance():
@@ -265,8 +197,6 @@ to invent supplier names or catalogue numbers.
         """)
 
 
-# ── sidebar ──────────────────────────────────────────────────────────────────
-
 root = models_root()
 if root is None:
     st.error(
@@ -293,16 +223,6 @@ if not print_models or not cell_models:
     st.stop()
 
 def default_index(entries: list[dict]) -> int:
-    """
-    Which model the menu opens on.
-
-    The highest-ranked model overall when a GPU is present. On a CPU host - a
-    free Hugging Face Space, or most laptops - the highest-ranked model that is
-    not a foundation model, because an in-context model re-reads its whole
-    context on every pass and turns a search that takes seconds into one taking
-    minutes. The foundation models stay in the menu with their cost stated; the
-    difference is only what a first-time visitor is given before choosing.
-    """
     if serving.device() == "cuda":
         return 0
     return next((i for i, e in enumerate(entries)
@@ -330,11 +250,6 @@ if st.sidebar.button("How many trials?", use_container_width=True):
     show_trial_guidance()
 
 st.sidebar.header("Protocol generation")
-# Never prefilled from the server's own key. `type="password"` masks a value
-# on screen but still sends it to the browser, so prefilling would hand the
-# operator's key to every visitor of a public deployment. A key configured on
-# the server remains usable - `proto.api_key` falls back to it when this field
-# is empty - but it is never transmitted.
 api_key_input = st.sidebar.text_input(
     "OpenRouter API key", type="password",
     help="Needed only for protocol generation. Held for this browser session "
@@ -357,7 +272,6 @@ st.sidebar.caption(
 if st.sidebar.button("How to get a key", use_container_width=True):
     show_api_key_guidance()
 
-# ── main ─────────────────────────────────────────────────────────────────────
 
 st.title("MLATE: Machine Learning Applications in Tissue Engineering")
 st.markdown(
@@ -566,10 +480,6 @@ if "best_params" in st.session_state:
 
         bio = {k: v for k, v in best.items() if k in BIOMATERIAL_OPTIONS}
         printing = {k: v for k, v in best.items() if k in PRINT_PARAMS}
-        # The neighbours and the extrapolation report are what ground the
-        # prompt. Passing neither leaves the template asserting that no similar
-        # formulation exists and that the candidate is in range, and neither
-        # would have been checked.
         corpus, groups = load_corpus()
         neighbours = (None if corpus is None else
                       proto.nearest_formulations(best, corpus, groups, n=3))
@@ -585,9 +495,6 @@ if "best_params" in st.session_state:
             neighbours=neighbours,
             extrapolation=st.session_state.get("best_distance"))
 
-        # Streamed rather than awaited. A free model takes between thirty
-        # seconds and two and a half minutes to write a protocol, and a
-        # spinner held for that long is indistinguishable from a hang.
         st.markdown("## Fabrication procedure")
         status = st.empty()
         stream_area = st.empty()

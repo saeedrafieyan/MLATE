@@ -1,32 +1,3 @@
-"""
-Generate the web application's static data files
-================================================
-
-    python 06_webapp/build_app_data.py
-
-The application ships four generated files so that it can start on a machine
-that has no copy of the dataset - a Hugging Face Space carries the models and
-the app, not the corpus. Generating them rather than maintaining them by hand
-is the point: the legacy lists had drifted from the data they were supposed to
-describe, carrying a misspelt cell line ("chondrocyteyte") and biomaterial
-names that no longer matched any dataset column ("laponite" against
-"Laponite-XLG (%w/w)"), so a user selecting them was choosing a feature the
-model had never seen.
-
-Writes:
-    biomaterials.py         BIOMATERIAL_OPTIONS, and observed ranges
-    cell_lines.py           CELL_LINE_OPTIONS, and observed density ranges
-    model_performance.py    the benchmarked test-set scores shown in the UI
-    corpus_reference.*      the observed formulations, for grounding
-
-The last is not a convenience. Two of the measures that constrain the language
-model - the nearest published formulations supplied as precedent, and the
-statement of whether the candidate lies inside the observed ranges - are
-computed against the corpus, so without it the prompt would assert that no
-similar formulation exists and that the candidate is in range, neither of which
-would have been checked. It carries only the predictor and target columns.
-"""
-
 from __future__ import annotations
 
 import json
@@ -46,11 +17,6 @@ HERE = Path(__file__).resolve().parent
 ML_TABLES = cfg.step_dir("04_machine_learning", "tables")
 DL_TABLES = cfg.step_dir("05_deep_learning", "tables")
 
-# The application serves prediction inside the design space the corpus covers,
-# which is the interpolation regime the random protocol estimates. Study-grouped
-# scores are the conservative bound for a genuinely new laboratory and are
-# reported in the manuscript; they describe a harder task than the one a user of
-# the tool is performing.
 PROTOCOL = "random"
 TOP_N = 12
 
@@ -62,7 +28,6 @@ def _header(title: str) -> str:
 
 
 def build_biomaterials(df, columns) -> None:
-    """Material names exactly as the model's feature columns spell them."""
     mats = list(columns.biomaterials)
     ranges = {}
     for m in mats:
@@ -120,14 +85,6 @@ def build_cell_lines(df, columns) -> None:
 
 
 def served_pairs() -> set[tuple[str, str]]:
-    """
-    The (model, task) pairs the application can offer.
-
-    Resolved through the serving layer rather than by listing one directory, so
-    the column cannot claim a model is in the menu that the menu does not in
-    fact contain. All three families are servable: the conventional
-    classifiers, the deep networks, and the in-context foundation models.
-    """
     from mlate import serving
     return {(stub.name, task)
             for task in ("printability", "cell_response")
@@ -135,13 +92,6 @@ def served_pairs() -> set[tuple[str, str]]:
 
 
 def build_performance() -> None:
-    """
-    Benchmarked test-set scores for the models the application offers.
-
-    Read from the tuned benchmark rather than transcribed, because the legacy
-    table described models that no longer exist and scores that were never
-    recomputed after the dataset grew.
-    """
     frames = []
     ml = ML_TABLES / "tuned_benchmark.xlsx"
     if ml.exists():
@@ -167,11 +117,6 @@ def build_performance() -> None:
                   & (board["protocol"] == PROTOCOL)
                   & (~board["model"].str.startswith("Dummy"))]
 
-    # Which of these the application can put in its menu. Every family is
-    # servable, so the column is normally all "yes"; it exists because the
-    # benchmark also contains configurations that were scored and not
-    # exported, and a reader comparing the table against the menu should not
-    # have to guess which those are.
     served = served_pairs()
     board["served"] = [(m, t) in served
                        for m, t in zip(board["model"], board["task"])]
@@ -214,14 +159,6 @@ def build_performance() -> None:
 
 
 def build_corpus_reference(df, columns) -> None:
-    """
-    The formulations themselves, trimmed to what grounding and range checks need.
-
-    Column groups are written beside the table because `nearest_formulations`
-    and `distance_report` need to know which columns are biomaterials, which are
-    printing parameters and which are targets, and the application has no
-    dataset loader to ask.
-    """
     keep = [c for c in (list(columns.biomaterials) + list(cfg.CELL_COLS)
                         + list(columns.print_params) + list(cfg.TARGETS))
             if c in df.columns]

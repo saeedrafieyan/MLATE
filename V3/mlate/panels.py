@@ -1,37 +1,3 @@
-"""
-Composite benchmark panels
-==========================
-
-One reusable figure builder, used by the conventional-ML benchmark and by the
-deep-learning/foundation benchmark, so the two figures share a visual grammar
-and - critically - a metric order.
-
-The layout answers three questions in one read:
-
-  A   which model is best, and what does study grouping cost it
-  B   how does it score on every other metric, random split
-  C   does that profile survive grouping
-
-All panels share one y-axis: the models, sorted once by their random-split F1.
-That shared order is what lets the eye travel horizontally from "this model
-wins" to "and here is its whole metric profile under both protocols".
-
-Encodings, all from style.py
-----------------------------
-protocol   navy = random, slate = study-grouped, on the dumbbell dots
-family     a colour rug down the left edge of panel A, keyed to the same
-           eleven-family palette Figures S9-S11 already use. Family cannot go
-           on the dots, because the dots carry protocol; a rug adds the second
-           categorical dimension without spending a third visual channel.
-metrics    order comes from style.metric_columns() and is never passed in - a
-           per-figure metric list is what produced the inconsistency Referee 1
-           flagged in comment 5.
-
-Sorting on the random split is deliberate: the navy dots then descend
-monotonically while the slate dots scatter, and that scatter is the finding,
-because the two protocols do not agree on which model is best.
-"""
-
 from __future__ import annotations
 
 import numpy as np
@@ -46,17 +12,9 @@ HEADLINE = "weighted_f1"
 
 def _heat(ax, frame: pd.DataFrame, cols: list[str], annotate: bool,
           tag: str, title: str):
-    """One metric heatmap, rows already in the plotted order."""
     data = frame[cols].to_numpy(dtype=float)
-    # Value text shrinks with the row count so every cell stays labelled even
-    # at thirty-one rows. Below ~4 pt the glyphs stop being legible in print,
-    # so that is the floor; the panel gets taller rather than the text smaller.
     n_rows = data.shape[0]
     vsize = 5.2 if n_rows <= 12 else (4.6 if n_rows <= 22 else 4.2)
-    # origin="lower" is mandatory, not cosmetic. imshow defaults to row 0 at
-    # the TOP while a scatter puts y=0 at the BOTTOM, so the default silently
-    # flips this panel relative to A and pairs every model with another
-    # model's metric profile.
     ax.imshow(np.clip(data, 0.0, 1.0), cmap=ms.SEQ_NAVY, vmin=0.0, vmax=1.0,
               aspect="auto", origin="lower", interpolation="nearest")
 
@@ -64,27 +22,16 @@ def _heat(ax, frame: pd.DataFrame, cols: list[str], annotate: bool,
         for j in range(data.shape[1]):
             v = data[i, j]
             if np.isnan(v):
-                # Not missing data: these estimators expose no predict_proba,
-                # so ROC-AUC is undefined rather than unmeasured. Marked
-                # rather than left blank, so a reader does not read an empty
-                # cell as a zero.
                 ax.add_patch(Rectangle((j - .5, i - .5), 1, 1,
                                        facecolor=ms.MISSING, lw=0))
                 if annotate:
                     ax.text(j, i, "n/a", ha="center", va="center",
                             size=vsize - 0.3, color=ms.MUTED)
                 continue
-            # A sequential ramp cannot express a negative MCC or kappa, and
-            # "worse than chance" is a qualitative statement rather than a
-            # paler shade of the same thing.
             if v < 0:
                 ax.add_patch(Rectangle((j - .5, i - .5), 1, 1,
                                        facecolor=ms.RUST, lw=0))
             if annotate:
-                # Leading zero kept: ".79" saves one glyph and costs the
-                # reader a decision about what the value is. Bold because the
-                # numbers sit on a mid-tone ramp where regular weight at
-                # 4-5 pt loses contrast against the darker cells.
                 ax.text(j, i, f"{v:.2f}", ha="center", va="center",
                         size=vsize, weight="bold",
                         color="white" if (v > .62 or v < 0) else ms.TEXT)
@@ -108,14 +55,6 @@ def benchmark_panel(board: pd.DataFrame, *, families: pd.Series | None = None,
                     sort_protocol: str = "random",
                     row_height: float = 0.155,
                     title: str = "", subtitle: str = ""):
-    """
-    Three-panel benchmark figure for one target.
-
-    `board` carries one row per (model, protocol) for the TEST partition,
-    already filtered to a single selection, with metric columns named as in
-    style.METRIC_ORDER. `families` maps model name to family for the colour
-    rug; omit it and the rug is dropped.
-    """
     cols = [c for c in ms.metric_columns() if c in board.columns]
     wide = board.pivot_table(index="model", columns="protocol",
                              values=HEADLINE)
@@ -154,12 +93,6 @@ def benchmark_panel(board: pd.DataFrame, *, families: pd.Series | None = None,
     ax.scatter(rnd, y, s=21, color=ms.PROTOCOL_COLORS["random"], zorder=4,
                linewidths=0)
 
-    # Each value is placed on the OUTWARD side of its own dot - away from the
-    # other protocol's dot - rather than always right/always left. When the two
-    # scores are close the fixed-side version drew both labels into the gap
-    # between them, where they overlapped each other and the markers. Outward
-    # placement cannot collide however near the dots are, and colour still
-    # says which label belongs to which protocol.
     for i in range(n):
         a, b = rnd[i], doi[i]
         rnd_right = (not np.isfinite(b)) or a >= b
@@ -176,10 +109,6 @@ def benchmark_panel(board: pd.DataFrame, *, families: pd.Series | None = None,
                         size=5.1, color=ms.PROTOCOL_COLORS["doi"],
                         path_effects=ms.halo(1.8), zorder=6)
 
-    # One baseline per protocol, not one for the figure: the two protocols
-    # have different test partitions with different class balance, so the
-    # majority-class score differs between them (printability: 0.333 random
-    # vs 0.375 grouped). A single line would misplace one of the two.
     for proto, value in (baselines or {}).items():
         ax.axvline(value, color=ms.PROTOCOL_COLORS.get(proto, ms.RUST),
                    lw=0.9, ls=(0, (3, 2)), zorder=2, alpha=0.75)
@@ -195,8 +124,6 @@ def benchmark_panel(board: pd.DataFrame, *, families: pd.Series | None = None,
     ax.set_xlabel("weighted F1", size=7)
     ms.grid_axis(ax, "x")
     ms.despine(ax, keep=("bottom",))
-    # pad clears the family rug, which occupies the strip just left of the
-    # axes; without it the labels are drawn underneath the rug and clipped.
     ax.tick_params(axis="y", length=0, pad=11 if families is not None
                    else 2)
     ax.set_title("weighted F1 by validation protocol", size=6.6,
@@ -204,8 +131,6 @@ def benchmark_panel(board: pd.DataFrame, *, families: pd.Series | None = None,
     ax.text(-0.315, 1.0, "A", transform=ax.transAxes, size=8.5,
             weight="bold", ha="left", va="bottom", color=ms.TEXT)
 
-    # Family rug: a slim band between the labels and the plot, so family is
-    # readable without spending the dot colour, which encodes protocol.
     if families is not None:
         fam = families.reindex(order)
         rug = ax.inset_axes([-0.026, 0.0, 0.017, 1.0],

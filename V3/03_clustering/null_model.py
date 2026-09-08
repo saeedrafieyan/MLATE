@@ -1,29 +1,3 @@
-"""
-Is there cluster structure, and what is it made of?
-===================================================
-
-    python 03_clustering/null_model.py
-
-Silhouette rises monotonically with k across the whole sweep and never turns
-over, which by itself is ambiguous: it is what you see when there is rich
-fine-grained structure, and it is also what you see when there is none at all
-and the score is simply rewarding smaller, tighter groups. Two references
-separate those cases.
-
-  null model     the same matrix with every column independently permuted. This
-                 destroys the joint structure while preserving each column's
-                 marginal distribution, so the difference between real and null
-                 silhouette is the part attributable to genuine co-variation
-                 between features.
-  external label agreement between the partition and DOI as k increases. If the
-                 fine structure being resolved is chemistry, agreement with
-                 tissue and material class should track it; if it is provenance,
-                 agreement with the source publication will.
-
-Together these say what kind of structure the sweep is picking up, which
-determines how the resulting clusters may be described.
-"""
-
 from __future__ import annotations
 
 import sys

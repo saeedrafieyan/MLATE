@@ -1,33 +1,3 @@
-"""
-Select, refit and ship the final models
-=======================================
-
-(Named export_models.py, not select.py: a script sits first on sys.path, so a
-module named select.py shadows the standard library's `select` and breaks any
-later `import asyncio` in the same interpreter.)
-
-    python 04_machine_learning/export_models.py
-
-Takes the leading models from the benchmark, refits each on the whole dataset,
-and writes a deployment bundle for the web application.
-
-Selection is on **DOI-grouped macro F1**, not on random-split accuracy. Random
-splitting answers a question the deployed tool never faces: a user submitting a
-new formulation is, by construction, a study the model has not seen. Ranking on
-the grouped protocol means the shipped model is the one that was best at the job
-it will actually do, even where that is not the model with the highest headline
-number.
-
-Baselines are excluded from selection but their scores are carried into the
-manifest, so the margin the shipped model holds over a constant prediction
-travels with it rather than living only in the paper.
-
-Artefacts land in deploy/models/, which is git-ignored: GitHub carries the code
-and the dataset, Hugging Face carries the trained models. Each model is stored
-with the preprocessor it was fitted against, because a model and a feature
-contract are only meaningful together.
-"""
-
 from __future__ import annotations
 
 import hashlib

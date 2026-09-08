@@ -1,38 +1,3 @@
-"""
-Four things that might close the protocol gap
-=============================================
-
-    python 04_machine_learning/ablations.py
-
-A focused study on six representative models rather than the full zoo, because
-the question is whether a technique helps at all, not which model wins.
-
-Conditions
-----------
-base           the pipeline as reported in the main benchmark
-smote          SMOTE applied to the training rows of each fold
-ros            random oversampling of the training rows of each fold
-ordinal        Frank & Hall ordinal decomposition of the base model
-+printability  Printability added as an input feature (Cell Response only)
-+pred_print    a *predicted* Printability added instead (Cell Response only)
-
-Resampling is applied strictly inside the training partition of each fold.
-Applying it before splitting is the classic error: SMOTE interpolates between
-neighbouring samples, neighbours are overwhelmingly same-study rows, and any
-synthetic point built across a fold boundary manufactures exactly the study
-leakage the grouped protocol exists to prevent.
-
-The two Printability conditions answer different questions and must not be
-conflated. `+printability` supplies the *measured* value and is an oracle: it
-establishes whether the relationship exists at all, but is not deployable,
-because a user designing a new scaffold does not yet know how well it prints -
-that is the other thing MLATE predicts. `+pred_print` is the deployable cascade:
-Printability is predicted first and the prediction is fed forward. It is built
-with out-of-fold predictions inside the training partition and a model fitted on
-the whole training partition for the test rows, so no test-fold information
-reaches either stage.
-"""
-
 from __future__ import annotations
 
 import sys
@@ -65,16 +30,6 @@ PROTOCOLS = ("random", "doi")
 
 
 class Ordinal(BaseEstimator, ClassifierMixin):
-    """
-    Frank & Hall (2001) ordinal decomposition.
-
-    For K ordered classes, fit K-1 binary models for P(y > k) and difference
-    the cumulative probabilities to recover class probabilities. Both targets
-    here are ordered - a Printability of 0 predicted as 3 is a worse error than
-    predicting 2 - and treating them as unordered discards that. The cumulative
-    probabilities are made monotone before differencing, since nothing forces
-    the independently fitted binary models to agree.
-    """
 
     def __init__(self, estimator=None):
         self.estimator = estimator
@@ -92,7 +47,7 @@ class Ordinal(BaseEstimator, ClassifierMixin):
     def predict_proba(self, X):
         cum = np.column_stack([e.predict_proba(X)[:, 1]
                                for e in self.estimators_])
-        cum = np.minimum.accumulate(cum, axis=1)          # enforce monotonicity
+        cum = np.minimum.accumulate(cum, axis=1)
         n, K = len(cum), len(self.classes_)
         out = np.zeros((n, K))
         out[:, 0] = 1.0 - cum[:, 0]
@@ -107,7 +62,6 @@ class Ordinal(BaseEstimator, ClassifierMixin):
 
 
 def _resample(kind, X, y, seed=cfg.RANDOM_STATE):
-    """Oversample the training partition only."""
     counts = pd.Series(y).value_counts()
     if kind == "smote":
         from imblearn.over_sampling import SMOTE
@@ -122,16 +76,6 @@ def _resample(kind, X, y, seed=cfg.RANDOM_STATE):
 
 
 def _printability_feature(df, columns, fold, kind, budget):
-    """
-    A Printability column for the Cell Response tasks.
-
-    'true'  the measured value, an oracle upper bound.
-    'pred'  a cascade: out-of-fold predictions inside the training partition,
-            and a model fitted on the whole training partition for the test
-            rows. Using the fitted model's own training predictions instead
-            would give the second stage a first stage that looks far more
-            accurate than it is at deployment.
-    """
     truth = df["Printability"].to_numpy(int)
     if kind == "true":
         return truth.astype(float)
@@ -178,8 +122,6 @@ def run_condition(df, columns, task, protocol, condition, budget) -> list[dict]:
         if condition in ("smote", "ros"):
             Xtr, ytr = _resample(condition, Xtr, ytr)
 
-        # Encode labels to 0..n-1: XGBoost rejects anything else, and Cell
-        # Response runs 2-5 here. Same convention as the main benchmark.
         code = {c: i for i, c in enumerate(labels)}
         decode = np.asarray(labels)
         ytr_enc = np.asarray([code[v] for v in ytr])
@@ -236,7 +178,6 @@ def main() -> None:
                [["accuracy", "balanced_accuracy", "macro_f1",
                  "quadratic_kappa", "mcc"]].mean().reset_index())
 
-    # Change against the 'base' condition, per model.
     base = (summary[summary["condition"] == "base"]
             .set_index(["task", "protocol", "model"])["macro_f1"])
     summary["macro_f1_vs_base"] = summary.apply(

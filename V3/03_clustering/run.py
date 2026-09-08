@@ -1,62 +1,3 @@
-"""
-Cluster the formulation space
-=============================
-
-    python 03_clustering/run.py                    # the partition in the paper
-    python 03_clustering/run.py --k 6              # explore another k
-    python 03_clustering/run.py --space pca        # sensitivity
-    python 03_clustering/run.py --drop-reported-flags   # sensitivity
-
-Fits the reported partition - KMeans, k = 3, in the raw feature space - and
-writes it, its model and the full algorithm x k sweep that justifies it.
-
-What goes in
-------------
-The 153 columns the supervised models receive. The targets are already absent
-from the feature matrix and the script asserts it rather than trusting the
-pipeline: 130 biomaterial concentrations, the binary-encoded cell line, cell
-density, seven printing parameters and seven indicators recording whether each
-printing parameter was reported. Bibliographic fields, tissue annotation,
-Printability and Cell Response never enter. They are used only afterwards, to
-characterise and validate a partition they had no part in forming, which is
-what makes the external-agreement results in diagnose.py meaningful rather than
-circular.
-
-The space is raw, not PCA. An earlier version reduced to 47 components first
-and justified it by the sparse biomaterial block dominating Euclidean distance.
-Measured rather than assumed, that claim is false: distance correlates with the
-count of jointly-zero columns at -0.775 raw and -0.770 after PCA, so the
-projection buys nothing it was meant to buy. `--space pca` reproduces the
-reduced variant as a sensitivity check.
-
-Where k = 3 comes from
-----------------------
-Not from silhouette. Silhouette rises monotonically from k = 2 to k = 60 on
-this corpus, as does the gap statistic, so any rule of the form "highest
-silhouette within k in [a, b]" returns the edge of its own window - which is how
-earlier drafts of this analysis produced 12, then 15, then 2 from the same data.
-Those were facts about the window, not about the corpus.
-
-k = 3 comes from two criteria constructed to have an interior optimum, both
-computed in select_k.py over five algorithms and k = 2..20:
-
-  prediction strength   0.936   the highest of all 95 configurations tested,
-                                and the only k > 2 clearing the conventional
-                                0.80 threshold. It collapses to 0.576 at k = 4.
-  PAC                   0.026   the lowest of all 95, rising to 0.178 at k = 4.
-
-Bootstrap stability (0.961) agrees. Silhouette does not - it prefers k = 2 and
-then every larger k - and that disagreement is reported rather than hidden,
-because it is the reason the earlier drafts went wrong.
-
-The honest caveat travels with the number: three clusters separate cellularity
-and process regime but resolve little biomaterial structure. Chemically
-distinct groups only appear at k >= 5, and those partitions do not survive on
-held-out data (prediction strength 0.52 and below). figure_k_choice.py shows
-that trade-off, and the manuscript reports it as a finding: this formulation
-space is a continuum, not a set of modes.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -79,18 +20,6 @@ TABLES = cfg.step_dir("03_clustering", "tables")
 MODELS = cfg.step_dir("03_clustering", "models")
 MATRIX = cfg.step_dir("02_preprocessing", "tables") / "feature_matrix.parquet"
 
-# The reported partition. Chosen by prediction strength and PAC in
-# select_k.py, not by the silhouette-based sweep below, which is retained only
-# because the submitted manuscript reported those indices and a reader needs
-# them to compare.
-#
-# Note this is NOT the single highest prediction strength in the grid: k-means
-# at k = 3 scores 0.936 against 0.794 here. It is not adopted because it splits
-# a coherent group - 477 entirely cellular records defined by ionic
-# alginate-CaCl2 crosslinking are divided 263/214 across two of its three
-# clusters - while bisecting k-means at k = 4 keeps that group intact, nests
-# exactly inside the robust cellular/acellular division, and separates
-# cellularity better (purity 0.936 against 0.830). See the module docstring.
 FINAL_ALGORITHM = "BisectingKMeans"
 FINAL_K = 4
 
@@ -100,7 +29,6 @@ K_CEILING = 15
 
 
 def load_matrix(drop_flags: bool) -> pd.DataFrame:
-    """The clustering input, with the target-exclusion asserted, not assumed."""
     matrix = pd.read_parquet(MATRIX)
     leaked = [c for c in matrix.columns
               if any(t.lower() in str(c).lower()
@@ -116,16 +44,6 @@ def load_matrix(drop_flags: bool) -> pd.DataFrame:
 
 
 def _one(name: str, k: int, X: np.ndarray, space: str) -> dict:
-    """
-    One (algorithm, k) cell: the four indices plus resampling stability.
-
-    Runs in a worker process, so every native thread pool is pinned to one
-    thread. Setting the environment variables here would be too late - OpenMP
-    reads them when its runtime initialises, long before this function is
-    called - and without the pin 51 workers each spawning 51 BLAS threads
-    oversubscribe the machine badly enough to make a parallel sweep slower than
-    a serial one.
-    """
     with resources.single_thread():
         make = cl.algorithms(space=space)[name]
         labels = cl.fit_predict(make(k), X)
@@ -170,9 +88,6 @@ def main() -> None:
                     verbose=1)(
         delayed(_one)(name, k, X, args.space) for name, k in jobs)
 
-    # HDBSCAN picks its own number of clusters, so it is swept over the
-    # minimum cluster size and reported alongside rather than ranked against
-    # the fixed-k methods.
     for size in (15, 25, 40, 60, 100):
         labels = HDBSCAN(min_cluster_size=size).fit_predict(X)
         n = int(len(np.unique(labels[labels >= 0])))

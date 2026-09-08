@@ -1,26 +1,3 @@
-"""
-The classifier zoo
-==================
-
-One registry, so that every step of the paper draws its models from the same
-place and a model cannot be configured differently in two scripts.
-
-Each entry carries what the runner needs to schedule it, not just how to build
-it: whether it parallelises internally (so the outer loop does not oversubscribe
-the CPU), whether it wants a GPU, whether it can produce calibrated
-probabilities, and roughly how expensive it is. Getting this wrong is the
-difference between a benchmark that finishes and one that thrashes.
-
-All models receive the same input: the fold-fitted preprocessor's output, which
-is dense, numeric, MinMax scaled to [0, 1] and free of NaN. Scaling is therefore
-not a per-model concern, which is why no entry carries a scaler of its own.
-
-Two dummy baselines are included deliberately and are not padding. On a task
-where the majority class holds 49.9% of the corpus, an accuracy of 0.55 means
-nothing until it is placed against the 0.499 a constant prediction achieves, and
-the grouped protocol makes that comparison sharper still.
-"""
-
 from __future__ import annotations
 
 import warnings
@@ -51,21 +28,19 @@ SEED = cfg.RANDOM_STATE
 
 @dataclass(frozen=True)
 class Spec:
-    """How to build one classifier and how to schedule it."""
     name: str
     family: str
     build: Callable[..., object]
-    threaded: bool = False      # uses n_jobs / OMP internally
-    gpu: bool = False           # can be placed on a CUDA device
-    proba: bool = True          # exposes predict_proba
-    cost: str = "low"           # low | medium | high, for scheduling order
+    threaded: bool = False
+    gpu: bool = False
+    proba: bool = True
+    cost: str = "low"
     notes: str = ""
 
 
 def _zoo() -> list[Spec]:
     S = Spec
     return [
-        # ── baselines ───────────────────────────────────────────────────────
         S("Dummy (majority)", "baseline",
           lambda **k: DummyClassifier(strategy="most_frequent"),
           notes="predicts the training majority class for every sample"),
@@ -73,7 +48,6 @@ def _zoo() -> list[Spec]:
           lambda **k: DummyClassifier(strategy="stratified", random_state=SEED),
           notes="samples from the training class distribution"),
 
-        # ── linear ──────────────────────────────────────────────────────────
         S("Logistic Regression", "linear",
           lambda n_jobs=1, **k: LogisticRegression(
               max_iter=3000, C=1.0, n_jobs=n_jobs, random_state=SEED),
@@ -99,7 +73,6 @@ def _zoo() -> list[Spec]:
           lambda **k: Perceptron(max_iter=3000, tol=1e-4, random_state=SEED),
           proba=False),
 
-        # ── discriminant and probabilistic ──────────────────────────────────
         S("Linear Discriminant", "discriminant",
           lambda **k: LinearDiscriminantAnalysis(solver="lsqr",
                                                  shrinkage="auto")),
@@ -112,7 +85,6 @@ def _zoo() -> list[Spec]:
           lambda **k: BernoulliNB(),
           notes="binarises at 0.5; suits the sparse biomaterial block"),
 
-        # ── instance based ──────────────────────────────────────────────────
         S("k-Nearest Neighbours", "neighbours",
           lambda n_jobs=1, **k: KNeighborsClassifier(n_neighbors=5,
                                                      n_jobs=n_jobs),
@@ -124,7 +96,6 @@ def _zoo() -> list[Spec]:
         S("Nearest Centroid", "neighbours",
           lambda **k: NearestCentroid(), proba=False),
 
-        # ── kernel machines ─────────────────────────────────────────────────
         S("SVM (RBF)", "svm",
           lambda **k: SVC(kernel="rbf", C=10.0, gamma="scale",
                           probability=True, random_state=SEED),
@@ -138,7 +109,6 @@ def _zoo() -> list[Spec]:
                                 random_state=SEED),
           proba=False),
 
-        # ── single trees ────────────────────────────────────────────────────
         S("Decision Tree", "tree",
           lambda **k: DecisionTreeClassifier(max_depth=12, min_samples_leaf=3,
                                              random_state=SEED)),
@@ -146,7 +116,6 @@ def _zoo() -> list[Spec]:
           lambda **k: ExtraTreeClassifier(max_depth=12, min_samples_leaf=3,
                                           random_state=SEED)),
 
-        # ── bagging ensembles ───────────────────────────────────────────────
         S("Random Forest", "bagging",
           lambda n_jobs=1, **k: RandomForestClassifier(
               n_estimators=500, min_samples_leaf=2, n_jobs=n_jobs,
@@ -170,7 +139,6 @@ def _zoo() -> list[Spec]:
               n_estimators=200, n_jobs=n_jobs, random_state=SEED),
           threaded=True, cost="medium"),
 
-        # ── boosting ────────────────────────────────────────────────────────
         S("AdaBoost", "boosting",
           lambda **k: AdaBoostClassifier(n_estimators=300, learning_rate=0.5,
                                          random_state=SEED),
@@ -191,14 +159,12 @@ def _zoo() -> list[Spec]:
         S("CatBoost", "boosting", _catboost, threaded=True, cost="medium",
           notes="ordered boosting; symmetric trees"),
 
-        # ── neural ──────────────────────────────────────────────────────────
         S("MLP (256-128)", "neural",
           lambda **k: MLPClassifier(
               hidden_layer_sizes=(256, 128), alpha=1e-3, max_iter=600,
               early_stopping=True, n_iter_no_change=25, random_state=SEED),
           threaded=True, cost="medium"),
 
-        # ── meta-ensembles ──────────────────────────────────────────────────
         S("Soft Voting (RF+XGB+LR)", "meta", _voting, threaded=True,
           cost="high",
           notes="soft vote over a bagging, a boosting and a linear learner"),
@@ -207,8 +173,6 @@ def _zoo() -> list[Spec]:
           notes="5-fold internal stacking, logistic meta-learner"),
     ]
 
-
-# ── library-backed builders, kept out of the table for readability ──────────
 
 def _xgboost(n_jobs: int = 1, device: str | None = None, **kwargs):
     from xgboost import XGBClassifier
@@ -267,8 +231,6 @@ def _stacking(n_jobs: int = 1, **kwargs):
         cv=5, n_jobs=1, passthrough=False)
 
 
-# ── public API ──────────────────────────────────────────────────────────────
-
 REGISTRY: dict[str, Spec] = {s.name: s for s in _zoo()}
 
 
@@ -278,7 +240,6 @@ def names(exclude_baselines: bool = False) -> list[str]:
 
 
 def build(name: str, n_jobs: int = 1, device: str | None = None):
-    """Instantiate a fresh, unfitted estimator."""
     spec = REGISTRY[name]
     kwargs = {}
     if spec.threaded:

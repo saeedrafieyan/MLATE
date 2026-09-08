@@ -1,6 +1,6 @@
 # MLATE V3
 
-Open-source cross-tissue AI framework for data-driven optimization of 3D-printed
+Open-source multi-tissue AI framework for data-driven optimization of 3D-printed
 and bioprinted tissue-engineering scaffolds.
 
 This repository contains the dataset, the full analysis pipeline and the web
@@ -38,8 +38,8 @@ Alongside it:
 
 | file | contents |
 |---|---|
-| `reference/biomaterial_taxonomy.csv` | the 130 materials and their functional classes |
-| `reference/cellline_synonyms.csv` | cell-line name normalization |
+| `01_data/reference/biomaterial_taxonomy.csv` | the 130 materials and their functional classes |
+| `01_data/reference/cellline_synonyms.csv` | cell-line name normalization |
 
 `01_data/build_dataset.py` additionally writes a column dictionary, an audit
 workbook and an internal copy carrying provenance columns; these are
@@ -109,7 +109,7 @@ Three protocols run side by side because they answer different questions.
 |---|---|---|
 | `random` | Interpolation: a formulation from a study already partly seen. This is the regime the web application operates in. | 99.4% |
 | `doi` | Generalization to an unseen laboratory; 45 studies held out entirely. | 0% |
-| `tissue` | Leave-one-tissue-out, supporting the cross-tissue claim. Studies spanning the held-out tissue are also removed from training. | 0% |
+| `tissue` | Leave-one-tissue-out, supporting the multi-tissue claim. Studies spanning the held-out tissue are also removed from training. | 0% |
 
 Hold-out sizes are 2,116 train / 530 test for `random` and 2,072 / 574 for
 `doi`. The test partition is isolated before any model is fitted and is never
@@ -136,5 +136,5 @@ the environment or a git-ignored `.env` file. Nothing else requires a key.
 
 ## Citation
 
-Rafieyan *et al.*, *MLATE V3: An Open-Source Cross-Tissue AI Framework for
+Rafieyan *et al.*, *MLATE V3: An Open-Source Multi-Tissue AI Framework for
 Data-Driven Optimization of 3D-Printed and Bioprinted Scaffolds*.

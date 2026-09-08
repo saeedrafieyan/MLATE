@@ -1,14 +1,3 @@
-"""
-Publication tables for the supervised section
-=============================================
-
-    python 04_machine_learning/manuscript_tables.py
-
-Emits Tables S11-S14 in the form the manuscript refers to, with the metric
-column order fixed by figure_detail.METRIC_ORDER so that the tables and the
-figures cannot disagree about how metrics are arranged.
-"""
-
 from __future__ import annotations
 
 import importlib.util
@@ -24,7 +13,6 @@ from mlate import config as cfg
 TABLES = cfg.step_dir("04_machine_learning", "tables")
 BENCH = TABLES / "model_benchmark.xlsx"
 
-# Import the sibling module by path: the folder is not a package.
 _spec = importlib.util.spec_from_file_location(
     "figure_detail", Path(__file__).resolve().parent / "figure_detail.py")
 _fd = importlib.util.module_from_spec(_spec)
@@ -59,10 +47,6 @@ def main() -> None:
     s13 = pd.read_excel(BENCH, sheet_name="protocol_gap")
     s14 = pd.read_excel(BENCH, sheet_name="unseen_material")
 
-    # One workbook per protocol, each carrying all 33 models against all three
-    # tasks, plus a combined workbook. The manuscript refers to the protocols
-    # separately, so they are separate files rather than sheets a reader has to
-    # find.
     files = {"random": "TableS11_random_split.xlsx",
              "doi": "TableS12_study_grouped.xlsx",
              "tissue": "TableS13_leave_one_tissue_out.xlsx"}
