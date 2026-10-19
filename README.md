@@ -23,8 +23,8 @@ https://doi.org/10.1088/1758-5090/ad6374
 
 ## MLATE V3
 ### MLATE V3: An Open-Source Cross-Tissue AI Framework for Data-Driven Optimization of 3D-Printed and Bioprinted Scaffolds
-Saeed Rafieyan *et al.* |
-Biofabrication | under review
+Saeed Rafieyan, Minoo Partovi Nasr, Elham Ansari, Alireza Kheradvar Kolour, Behnaz Banimohamad-Shotorbani and Ebrahim Vasheghani-Farahani |
+Biofabrication | https://doi.org/10.1088/1758-5090/aeb162
 
 Code, dataset and analysis pipeline: [`V3/`](V3)
 Web application: https://huggingface.co/spaces/Saeed/MLATE
